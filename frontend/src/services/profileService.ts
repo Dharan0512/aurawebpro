@@ -1,0 +1,37 @@
+import apiClient from "../lib/apiClient";
+
+export const profileService = {
+  getMyProfile: async () => {
+    const response = await apiClient.get("/profile/me");
+    return response.data;
+  },
+
+  updateProfile: async (profileData: any) => {
+    const response = await apiClient.patch("/profile", profileData);
+    return response.data;
+  },
+
+  saveDraft: async (draftData: { stepData: any; lastStep: number }) => {
+    const response = await apiClient.post("/profile/draft", draftData);
+    return response.data;
+  },
+
+  getDraft: async () => {
+    const response = await apiClient.get("/profile/draft");
+    return response.data;
+  },
+
+  uploadPhotos: async (formData: FormData) => {
+    const response = await apiClient.post("/profile/photos", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  },
+
+  deletePhoto: async (photoId: string | number) => {
+    const response = await apiClient.delete(`/profile/photos/${photoId}`);
+    return response.data;
+  },
+};

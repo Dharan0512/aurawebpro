@@ -1,0 +1,198 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { profileService } from "@/services/profileService";
+import { matchService, MatchProfile } from "@/services/matchService";
+import MatchCardSkeleton from "@/components/ui/MatchCardSkeleton";
+
+export default function DashboardPage() {
+  const [profile, setProfile] = useState<any>(null);
+  const [matches, setMatches] = useState<MatchProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [profileData, matchesData] = await Promise.all([
+          profileService.getMyProfile(),
+          matchService.getDailyMatches(),
+        ]);
+        setProfile(profileData);
+        setMatches(matchesData);
+      } catch (err) {
+        console.error("Failed to fetch dashboard data", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const userName = profile?.user?.firstName || "User";
+
+  return (
+    <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+      {/* Welcome & Premium Nudge */}
+      <div className="relative mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div>
+            <h1 className="text-4xl font-serif font-bold text-white tracking-tight">
+              Good evening,{" "}
+              {loading ? (
+                <span className="inline-block w-40 h-10 bg-white/5 rounded-lg animate-pulse align-middle" />
+              ) : (
+                <span className="bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                  {userName}
+                </span>
+              )}
+            </h1>
+            <p className="mt-3 text-lg text-slate-400 max-w-2xl leading-relaxed">
+              We've curated{" "}
+              <span className="text-[#D4AF37] font-semibold tracking-wide">
+                {matches.length} extraordinary matches
+              </span>{" "}
+              for you today, perfectly aligned with your lifestyle and
+              aspirations.
+            </p>
+          </div>
+          <div className="flex gap-4">
+            <div className="p-0.5 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500">
+              <div className="bg-slate-900 px-6 py-2 rounded-full text-white text-sm font-medium">
+                Premium Member
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Completion Banner */}
+      <div className="relative group mb-16 px-1">
+        <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+        <div className="relative bg-slate-900/40 backdrop-blur-2xl border border-white/5 p-8 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-8 shadow-2xl">
+          <div className="flex gap-6 items-center">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#D4AF37] to-[#B8860B] flex items-center justify-center text-slate-950 shadow-[0_0_20px_rgba(212,175,55,0.2)]">
+              <svg
+                className="w-8 h-8"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2.5"
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xl font-bold text-white">
+                Unlock 3x More Connections
+              </p>
+              <p className="text-slate-400 mt-1 max-w-md">
+                Your profile is{" "}
+                <span className="text-[#D4AF37] font-bold">20% complete</span>.
+                Complete your professional story to appear in high-priority
+                searches.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/onboarding"
+            className="w-full md:w-auto px-8 py-4 bg-white text-slate-950 rounded-2xl font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-xl hover:shadow-white/10"
+          >
+            Enhance Your Profile
+          </Link>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4 mb-10">
+        <h2 className="text-2xl font-serif font-bold text-white">
+          Daily Top Matches
+        </h2>
+        <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent"></div>
+      </div>
+
+      {/* Match Discovery Cards */}
+      <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-3">
+        {loading ? (
+          [1, 2, 3, 4, 5, 6].map((i) => <MatchCardSkeleton key={i} />)
+        ) : matches.length === 0 ? (
+          <div className="col-span-full py-20 text-center">
+            <p className="text-slate-500 font-bold uppercase tracking-widest">
+              No matches found for your criteria today.
+            </p>
+          </div>
+        ) : (
+          matches.map((match) => (
+            <div
+              key={match.userId}
+              className="group relative flex flex-col bg-slate-900/30 backdrop-blur-sm border border-white/5 rounded-[2.5rem] overflow-hidden hover:border-white/10 transition-all duration-500"
+            >
+              <div className="absolute inset-x-0 h-40 bg-gradient-to-b from-purple-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+
+              <div className="relative h-[28rem] m-3 overflow-hidden rounded-[2rem]">
+                <img
+                  src={
+                    match.photos[0] ||
+                    `https://images.unsplash.com/photo-${parseInt(match.userId) % 2 === 0 ? "1494790108377-be9c29b29330" : "1534528741775-53994a69daeb"}?q=80&w=1000&auto=format&fit=crop`
+                  }
+                  alt="Match"
+                  className="h-full w-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent"></div>
+
+                <div className="absolute top-5 right-5 z-20">
+                  <div className="bg-slate-900/80 backdrop-blur-md px-4 py-2 flex items-center rounded-full text-xs font-black text-white shadow-2xl border border-white/10">
+                    <span className="w-2 h-2 rounded-full bg-[#D4AF37] mr-2 animate-pulse"></span>
+                    {match.matchScore}% SYNC
+                  </div>
+                </div>
+
+                <div className="absolute bottom-6 left-6 right-6 z-10">
+                  <h3 className="text-3xl font-serif font-bold text-white mb-1">
+                    {match.basicDetails.firstName},{" "}
+                    {new Date().getFullYear() -
+                      new Date(match.basicDetails.dob).getFullYear() || 25}
+                  </h3>
+                  <div className="flex items-center text-slate-300 text-sm font-medium gap-2">
+                    <svg
+                      className="w-4 h-4 text-[#D4AF37]"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                    </svg>
+                    {match.basicDetails.location} •{" "}
+                    {match.professionalInfo.profession}
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-8 pb-8 pt-2">
+                <div className="flex flex-wrap gap-2 mb-6">
+                  <span className="text-[10px] font-black uppercase tracking-widest bg-white/5 text-slate-400 px-3 py-1.5 rounded-lg border border-white/5">
+                    {match.basicDetails.religion}
+                  </span>
+                  <span className="text-[10px] font-black uppercase tracking-widest bg-white/5 text-slate-400 px-3 py-1.5 rounded-lg border border-white/5">
+                    Premium
+                  </span>
+                </div>
+
+                <div className="flex gap-4">
+                  <button className="flex-1 bg-white/5 hover:bg-white/10 text-white text-xs font-black uppercase tracking-[0.2em] py-4 rounded-2xl border border-white/5 transition-all outline-none">
+                    Profile
+                  </button>
+                  <button className="flex-[1.5] bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-black uppercase tracking-[0.2em] py-4 rounded-2xl shadow-xl hover:shadow-purple-500/20 hover:scale-[1.02] active:scale-95 transition-all outline-none">
+                    Connect
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

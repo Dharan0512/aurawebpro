@@ -1,0 +1,128 @@
+import {
+  Country,
+  MotherTongue,
+  Height,
+  Religion,
+  Caste,
+} from "../models/sequelize";
+
+const seedCountries = [
+  { name: "India", isoCode: "IN", phoneCode: "+91", isActive: true },
+  { name: "United States", isoCode: "US", phoneCode: "+1", isActive: true },
+  { name: "United Kingdom", isoCode: "GB", phoneCode: "+44", isActive: true },
+  { name: "Australia", isoCode: "AU", phoneCode: "+61", isActive: true },
+  { name: "Canada", isoCode: "CA", phoneCode: "+1", isActive: true },
+  {
+    name: "United Arab Emirates",
+    isoCode: "AE",
+    phoneCode: "+971",
+    isActive: true,
+  },
+];
+
+const seedMotherTongues = [
+  { name: "English", isActive: true },
+  { name: "Hindi", isActive: true },
+  { name: "Tamil", isActive: true },
+  { name: "Telugu", isActive: true },
+  { name: "Marathi", isActive: true },
+  { name: "Gujarati", isActive: true },
+  { name: "Bengali", isActive: true },
+  { name: "Urdu", isActive: true },
+  { name: "Malayalam", isActive: true },
+  { name: "Kannada", isActive: true },
+  { name: "Odia", isActive: true },
+  { name: "Punjabi", isActive: true },
+];
+
+const seedReligions = [
+  { name: "Hindu", isActive: true },
+  { name: "Muslim", isActive: true },
+  { name: "Christian", isActive: true },
+  { name: "Sikh", isActive: true },
+  { name: "Jain", isActive: true },
+  { name: "Buddhist", isActive: true },
+];
+
+const seedCastesByReligion = {
+  Hindu: [
+    "Brahmin",
+    "Kshatriya",
+    "Vaisya",
+    "Shudra",
+    "Yadav",
+    "Rajput",
+    "Agarwal",
+  ],
+  Muslim: ["Sunni", "Shia", "Pathan", "Syed"],
+  Christian: ["Catholic", "Protestant", "Orthodox"],
+  Sikh: ["Jat", "Khatri", "Arora", "Ramgarhia"],
+};
+
+const generateHeights = () => {
+  const heights = [];
+  for (let cm = 135; cm <= 215; cm++) {
+    const inchesTotal = cm / 2.54;
+    const feet = Math.floor(inchesTotal / 12);
+    const inches = Math.round(inchesTotal % 12);
+    heights.push({
+      cmValue: cm,
+      displayLabel: `${feet}'${inches}" (${cm}cm)`,
+    });
+  }
+  return heights;
+};
+
+export const seedMasterData = async () => {
+  try {
+    // Check and seed Countries
+    const countryCount = await Country.count();
+    if (countryCount === 0) {
+      console.log("Seeding initial Countries...");
+      await Country.bulkCreate(seedCountries);
+      console.log("Countries seeded successfully.");
+    }
+
+    // Check and seed Mother Tongues
+    const mtCount = await MotherTongue.count();
+    if (mtCount === 0) {
+      console.log("Seeding initial Mother Tongues...");
+      await MotherTongue.bulkCreate(seedMotherTongues);
+      console.log("Mother Tongues seeded successfully.");
+    }
+
+    // Check and seed Heights
+    const heightCount = await Height.count();
+    if (heightCount === 0) {
+      console.log("Seeding Heights...");
+      await Height.bulkCreate(generateHeights());
+      console.log("Heights seeded.");
+    }
+
+    // Check and seed Religions and Castes
+    const religionCount = await Religion.count();
+    if (religionCount === 0) {
+      console.log("Seeding Religions and Castes...");
+      const religions = await Religion.bulkCreate(seedReligions, {
+        returning: true,
+      });
+
+      const casteList = [];
+      for (const rel of religions) {
+        const casteNames =
+          seedCastesByReligion[rel.name as keyof typeof seedCastesByReligion] ||
+          [];
+        for (const cName of casteNames) {
+          casteList.push({ name: cName, religionId: rel.id, isActive: true });
+        }
+      }
+
+      if (casteList.length > 0) {
+        await Caste.bulkCreate(casteList);
+      }
+      console.log("Religions & Castes seeded.");
+    }
+  } catch (error) {
+    console.error("Error seeding master data:", error);
+  }
+};
