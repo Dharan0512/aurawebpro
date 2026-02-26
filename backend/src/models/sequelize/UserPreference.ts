@@ -7,7 +7,7 @@ import { Country } from "./master/Country";
 import { State } from "./master/State";
 import { Education } from "./master/Education";
 
-interface PartnerPreferenceAttributes {
+interface UserPreferenceAttributes {
   id: number;
   userId: number;
   minAge: number;
@@ -20,12 +20,18 @@ interface PartnerPreferenceAttributes {
   educationId: number | null;
   countryId: number | null;
   stateId: number | null;
+  // Step 6: Additional Preferences
+  preferredLocation: string | null;
+  preferredEducation: string | null;
+  preferredIncomeRange: string | null;
+  mustHave: any | null; // JSONB
+  dealBreakers: any | null; // JSONB
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-interface PartnerPreferenceCreationAttributes extends Optional<
-  PartnerPreferenceAttributes,
+interface UserPreferenceCreationAttributes extends Optional<
+  UserPreferenceAttributes,
   | "id"
   | "minAge"
   | "maxAge"
@@ -37,14 +43,16 @@ interface PartnerPreferenceCreationAttributes extends Optional<
   | "educationId"
   | "countryId"
   | "stateId"
+  | "preferredLocation"
+  | "preferredEducation"
+  | "preferredIncomeRange"
+  | "mustHave"
+  | "dealBreakers"
 > {}
 
-export class PartnerPreference
-  extends Model<
-    PartnerPreferenceAttributes,
-    PartnerPreferenceCreationAttributes
-  >
-  implements PartnerPreferenceAttributes
+export class UserPreference
+  extends Model<UserPreferenceAttributes, UserPreferenceCreationAttributes>
+  implements UserPreferenceAttributes
 {
   public id!: number;
   public userId!: number;
@@ -58,12 +66,17 @@ export class PartnerPreference
   public educationId!: number | null;
   public countryId!: number | null;
   public stateId!: number | null;
+  public preferredLocation!: string | null;
+  public preferredEducation!: string | null;
+  public preferredIncomeRange!: string | null;
+  public mustHave!: any | null;
+  public dealBreakers!: any | null;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
 
-PartnerPreference.init(
+UserPreference.init(
   {
     id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -81,9 +94,7 @@ PartnerPreference.init(
     maxAge: { type: DataTypes.INTEGER, defaultValue: 40 },
     minHeightCm: { type: DataTypes.INTEGER, allowNull: true },
     maxHeightCm: { type: DataTypes.INTEGER, allowNull: true },
-    maritalStatus: { type: DataTypes.STRING(255), allowNull: true }, // Store as "Never Married,Divorced"
-
-    // Foreign Keys to Master Tables
+    maritalStatus: { type: DataTypes.STRING(255), allowNull: true },
     religionId: {
       type: DataTypes.INTEGER,
       allowNull: true,
@@ -114,28 +125,33 @@ PartnerPreference.init(
       references: { model: State, key: "id" },
       onDelete: "SET NULL",
     },
+    preferredLocation: { type: DataTypes.STRING(255), allowNull: true },
+    preferredEducation: { type: DataTypes.STRING(255), allowNull: true },
+    preferredIncomeRange: { type: DataTypes.STRING(100), allowNull: true },
+    mustHave: { type: DataTypes.JSONB, allowNull: true },
+    dealBreakers: { type: DataTypes.JSONB, allowNull: true },
   },
   {
     sequelize,
-    tableName: "partner_preferences",
+    tableName: "user_preferences",
     timestamps: true,
   },
 );
 
-User.hasOne(PartnerPreference, { foreignKey: "userId" });
-PartnerPreference.belongsTo(User, { foreignKey: "userId" });
+User.hasOne(UserPreference, { foreignKey: "userId" });
+UserPreference.belongsTo(User, { foreignKey: "userId" });
 
-PartnerPreference.belongsTo(Religion, { foreignKey: "religionId" });
-Religion.hasMany(PartnerPreference, { foreignKey: "religionId" });
+UserPreference.belongsTo(Religion, { foreignKey: "religionId" });
+Religion.hasMany(UserPreference, { foreignKey: "religionId" });
 
-PartnerPreference.belongsTo(Caste, { foreignKey: "casteId" });
-Caste.hasMany(PartnerPreference, { foreignKey: "casteId" });
+UserPreference.belongsTo(Caste, { foreignKey: "casteId" });
+Caste.hasMany(UserPreference, { foreignKey: "casteId" });
 
-PartnerPreference.belongsTo(Education, { foreignKey: "educationId" });
-Education.hasMany(PartnerPreference, { foreignKey: "educationId" });
+UserPreference.belongsTo(Education, { foreignKey: "educationId" });
+Education.hasMany(UserPreference, { foreignKey: "educationId" });
 
-PartnerPreference.belongsTo(Country, { foreignKey: "countryId" });
-Country.hasMany(PartnerPreference, { foreignKey: "countryId" });
+UserPreference.belongsTo(Country, { foreignKey: "countryId" });
+Country.hasMany(UserPreference, { foreignKey: "countryId" });
 
-PartnerPreference.belongsTo(State, { foreignKey: "stateId" });
-State.hasMany(PartnerPreference, { foreignKey: "stateId" });
+UserPreference.belongsTo(State, { foreignKey: "stateId" });
+State.hasMany(UserPreference, { foreignKey: "stateId" });

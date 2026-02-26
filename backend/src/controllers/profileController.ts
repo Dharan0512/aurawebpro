@@ -3,7 +3,7 @@ import { AuthRequest } from "../middlewares/authMiddleware";
 import {
   User,
   UserProfile,
-  PartnerPreference,
+  UserPreference,
   Religion,
   Education,
   Occupation,
@@ -17,7 +17,13 @@ import {
   IncomeRange,
   Currency,
   UserDraft,
+  FamilyDetails,
+  HoroscopeDetails,
+  LocationLifestyle,
+  EducationCareer,
+  Badge,
 } from "../models/sequelize";
+import { sequelize } from "../config/db.postgres";
 
 export const saveDraft = async (
   req: AuthRequest,
@@ -69,6 +75,7 @@ export const createOrUpdateProfile = async (
   req: AuthRequest,
   res: Response,
 ): Promise<void> => {
+  const transaction = await sequelize.transaction();
   try {
     if (!req.user) {
       res.status(401).json({ message: "Not authorized" });
@@ -78,54 +85,7 @@ export const createOrUpdateProfile = async (
     const userId = req.user.id;
     const profileData = req.body;
 
-    // --- MAPPING LEGACY NO-SQL PAYLOAD TO SQL NORMALIZED MASTER TABLES ---
-
-    // 1. Religion
-    let religionId =
-      profileData.religionId || profileData.basicDetails?.religionId;
-    if (!religionId) {
-      const religionName =
-        profileData.basicDetails?.religion || profileData.religion || "Other";
-      let religion = await Religion.findOne({ where: { name: religionName } });
-      if (!religion) religion = await Religion.create({ name: religionName });
-      religionId = religion.id;
-    }
-
-    // 2. Education
-    let educationId =
-      profileData.educationId ||
-      profileData.professionalInfo?.educationId ||
-      profileData.educationLevel;
-    if (!educationId) {
-      const eduName =
-        profileData.professionalInfo?.education ||
-        profileData.education ||
-        "Other";
-      let education = await Education.findOne({ where: { name: eduName } });
-      if (!education)
-        education = await Education.create({ name: eduName, level: "UG" });
-      educationId = education.id;
-    }
-
-    // 3. Location
-    let cityId = profileData.cityId || profileData.basicDetails?.cityId;
-    if (!cityId) {
-      const locName =
-        profileData.basicDetails?.location || profileData.location || "Unknown";
-      let city = await City.findOne({ where: { name: locName } });
-      if (!city) {
-        const country = await Country.findOrCreate({
-          where: { name: "Default Country", isoCode: "DC", phoneCode: "00" },
-        });
-        const state = await State.findOrCreate({
-          where: { name: "Default State", countryId: country[0].id },
-        });
-        city = await City.create({ name: locName, stateId: state[0].id });
-      }
-      cityId = city.id;
-    }
-
-    // Update the base User details
+    // 1. Update the base User details
     await User.update(
       {
         firstName:
@@ -134,7 +94,7 @@ export const createOrUpdateProfile = async (
         gender: ["Male", "Female", "Other"].includes(
           profileData.gender || profileData.basicDetails?.gender,
         )
-          ? profileData.gender || profileData.basicDetails.gender
+          ? profileData.gender || profileData.basicDetails?.gender
           : "Other",
         createdFor: ["Self", "Parent", "Guardian"].includes(
           profileData.createdFor || profileData.profileType,
@@ -142,7 +102,7 @@ export const createOrUpdateProfile = async (
           ? profileData.createdFor || profileData.profileType
           : "Self",
       },
-      { where: { id: userId } },
+      { where: { id: userId }, transaction },
     );
 
     // Helper to handle empty strings or missing IDs
@@ -152,66 +112,137 @@ export const createOrUpdateProfile = async (
       return isNaN(parsed) ? null : parsed;
     };
 
-    // Upsert UserProfile
+    // 2. Upsert UserProfile (Core Identity)
     const dobValue =
       profileData.dob || profileData.basicDetails?.dob
         ? new Date(profileData.dob || profileData.basicDetails.dob)
         : null;
     const dob = dobValue && !isNaN(dobValue.getTime()) ? dobValue : null;
 
-    const [userProfile] = await UserProfile.upsert({
-      userId,
-      dob,
-      heightCm: parseInt(profileData.height || profileData.heightCm) || 170,
-      physicalStatus: profileData.physicalStatus || "Normal",
-      maritalStatus: profileData.maritalStatus || "Never Married",
-      childrenCount: parseInt(profileData.childrenCount) || 0,
-      religionId: parseId(religionId),
-      educationId: parseId(educationId),
-      cityId: parseId(cityId),
-      stateId: parseId(profileData.stateId),
-      countryId: parseId(profileData.countryId),
-      motherTongueId: parseId(
-        profileData.motherTongueId || profileData.motherTongue,
-      ), // Fallback if ID is string name (needs fix)
-      casteId: parseId(profileData.casteId),
-      subcaste: profileData.subcaste || profileData.subCaste || "",
-      employmentTypeId: parseId(
-        profileData.employmentTypeId || profileData.employmentType,
-      ), // Needs fix
-      occupationId: parseId(profileData.occupationId || profileData.occupation), // Needs fix
-      incomeRangeId: parseId(
-        profileData.incomeRangeId || profileData.incomeRange,
-      ), // Needs fix
-      familyStatus: profileData.familyStatus || "Middle Class",
-    });
+    const [userProfile] = await UserProfile.upsert(
+      {
+        userId,
+        dob,
+        heightCm: parseInt(profileData.height || profileData.heightCm) || 170,
+        physicalStatus: profileData.physicalStatus || "Normal",
+        maritalStatus: profileData.maritalStatus || "Never Married",
+        childrenCount: parseInt(profileData.childrenCount) || 0,
+        religionId: parseId(profileData.religionId),
+        casteId: parseId(profileData.casteId),
+        motherTongueId: parseId(profileData.motherTongueId),
+        subcaste: profileData.subcaste || "",
+        complexion: profileData.complexion || "",
+        shortBio: profileData.shortBio || profileData.aboutMe || "",
+      },
+      { transaction },
+    );
 
-    // Upsert PartnerPreference
-    await PartnerPreference.upsert({
-      userId,
-      minAge:
-        profileData.partnerAgeMin ||
-        profileData.preferences?.ageRange?.min ||
-        18,
-      maxAge:
-        profileData.partnerAgeMax ||
-        profileData.preferences?.ageRange?.max ||
-        40,
-      religionId: parseId(religionId),
-      educationId: parseId(educationId),
-    });
+    const userProfileId = userProfile.id;
+
+    // 3. Upsert FamilyDetails
+    await FamilyDetails.upsert(
+      {
+        userProfileId,
+        fatherName: profileData.fatherName || null,
+        fatherOccupation: profileData.fatherOccupation || null,
+        motherName: profileData.motherName || null,
+        motherOccupation: profileData.motherOccupation || null,
+        familyType: profileData.familyType || null,
+        familyStatus: profileData.familyStatus || null,
+        siblingsCount: parseInt(profileData.siblingsCount) || 0,
+        ownHouse:
+          profileData.ownHouse === true || profileData.ownHouse === "true",
+        nativeDistrict: profileData.nativeDistrict || null,
+        familyLocation: profileData.familyLocation || null,
+      },
+      { transaction },
+    );
+
+    // 4. Upsert HoroscopeDetails
+    await HoroscopeDetails.upsert(
+      {
+        userProfileId,
+        star: profileData.star || null,
+        rasi: profileData.rasi || null,
+        laknam: profileData.laknam || null,
+        gothram: profileData.gothram || null,
+        sevvaiDhosham: profileData.sevvaiDhosham || null,
+        rahuKetuDhosham: profileData.rahuKetuDhosham || null,
+        birthTime: profileData.birthTime || null,
+        birthPlace: profileData.birthPlace || null,
+      },
+      { transaction },
+    );
+
+    // 5. Upsert LocationLifestyle
+    await LocationLifestyle.upsert(
+      {
+        userProfileId,
+        country: profileData.country || null,
+        state: profileData.state || null,
+        city: profileData.city || null,
+        relocatePreference: profileData.relocatePreference || null,
+        diet: profileData.diet || null,
+        drink: profileData.drink || null,
+        smoke: profileData.smoke || null,
+        fitnessLevel: profileData.fitnessLevel || null,
+        ambition: parseId(profileData.ambition),
+        familyOrientation: parseId(profileData.familyOrientation),
+        emotionalStability: parseId(profileData.emotionalStability),
+        communicationStyle: parseId(profileData.communicationStyle),
+        spiritualInclination: parseId(profileData.spiritualInclination),
+        languages: profileData.languages || [],
+        hobbies: profileData.hobbies || [],
+      },
+      { transaction },
+    );
+
+    // 6. Upsert EducationCareer
+    await EducationCareer.upsert(
+      {
+        userProfileId,
+        highestEducation: profileData.highestEducation || null,
+        fieldOfStudy: profileData.fieldOfStudy || null,
+        college: profileData.college || null,
+        employmentType: profileData.employmentType || null,
+        companyName: profileData.companyName || null,
+        designation: profileData.designation || null,
+        incomeRange: profileData.incomeRange || null,
+        exactIncome: profileData.exactIncome
+          ? parseInt(profileData.exactIncome)
+          : null,
+        careerPlanAfterMarriage: profileData.careerPlanAfterMarriage || null,
+      },
+      { transaction },
+    );
+
+    // 7. Upsert UserPreference
+    await UserPreference.upsert(
+      {
+        userId,
+        minAge: parseInt(profileData.partnerAgeMin) || 18,
+        maxAge: parseInt(profileData.partnerAgeMax) || 40,
+        minHeightCm: parseInt(profileData.partnerHeightMin) || null,
+        maxHeightCm: parseInt(profileData.partnerHeightMax) || null,
+        maritalStatus: profileData.partnerMaritalStatus || null,
+        religionId: parseId(profileData.religionId),
+        casteId: parseId(profileData.casteId),
+        preferredLocation: profileData.preferredLocation || null,
+        preferredEducation: profileData.preferredEducation || null,
+        preferredIncomeRange: profileData.preferredIncomeRange || null,
+      },
+      { transaction },
+    );
+
+    await transaction.commit();
 
     res.status(200).json({
-      message: "Profile saved successfully to MariaDB",
+      message: "Profile updated successfully",
       profile: userProfile,
     });
   } catch (error: any) {
-    console.error("Detailed Profile Save Error:", {
-      message: error.message,
-      name: error.name,
-      errors: error.errors, // For Sequelize validation errors
-      stack: error.stack,
-    });
+    await transaction.rollback();
+    console.error("Detailed Profile Save Error:", error);
     res.status(500).json({
       message: "Server error saving profile",
       details: error.message,
@@ -235,20 +266,21 @@ export const getMyProfile = async (
       where: { userId },
       include: [
         Religion,
-        Education,
         City,
         State,
         Country,
         MotherTongue,
         Caste,
-        EmploymentType,
-        Occupation,
-        IncomeRange,
+        FamilyDetails,
+        HoroscopeDetails,
+        LocationLifestyle,
+        EducationCareer,
+        Badge,
       ],
     });
-    const preferences = await PartnerPreference.findOne({
+    const preferences = await UserPreference.findOne({
       where: { userId },
-      include: [Religion, Education],
+      include: [Religion, Education, Country, State],
     });
     const userPhotos = await UserPhoto.findAll({
       where: { userId },
@@ -352,5 +384,89 @@ export const deletePhoto = async (
   } catch (error) {
     console.error("Photo delete error:", error);
     res.status(500).json({ message: "Server error deleting photo" });
+  }
+};
+export const uploadHoroscope = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ message: "Not authorized" });
+      return;
+    }
+
+    const userId = req.user.id;
+    const file = (req as any).file;
+
+    if (!file) {
+      res.status(400).json({ message: "Please upload a file" });
+      return;
+    }
+
+    const imageUrl = `/uploads/${file.filename}`;
+
+    const profile = await UserProfile.findOne({ where: { userId } });
+    if (!profile) {
+      res.status(404).json({ message: "Profile not found" });
+      return;
+    }
+
+    const [horoscope] = await HoroscopeDetails.upsert({
+      userProfileId: profile.id,
+      horoscopeImageUrl: imageUrl,
+    });
+
+    res.status(200).json({
+      message: "Horoscope uploaded successfully",
+      horoscope,
+    });
+  } catch (error) {
+    console.error("Horoscope upload error:", error);
+    res.status(500).json({ message: "Server error uploading horoscope" });
+  }
+};
+
+export const deleteHoroscope = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ message: "Not authorized" });
+      return;
+    }
+
+    const userId = req.user.id;
+    const profile = await UserProfile.findOne({ where: { userId } });
+    if (!profile) {
+      res.status(404).json({ message: "Profile not found" });
+      return;
+    }
+
+    const horoscope = await HoroscopeDetails.findOne({
+      where: { userProfileId: profile.id },
+    });
+
+    if (!horoscope || !horoscope.horoscopeImageUrl) {
+      res.status(404).json({ message: "Horoscope image not found" });
+      return;
+    }
+
+    // Optional: Delete physical file
+    // const fs = require('fs');
+    // const path = require('path');
+    // const filePath = path.join(process.cwd(), horoscope.horoscopeImageUrl);
+    // if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+    horoscope.horoscopeImageUrl = null;
+    await horoscope.save();
+
+    res.status(200).json({
+      message: "Horoscope image deleted successfully",
+    });
+  } catch (error) {
+    console.error("Horoscope delete error:", error);
+    res.status(500).json({ message: "Server error deleting horoscope" });
   }
 };

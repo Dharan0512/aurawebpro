@@ -17,9 +17,14 @@ import { IncomeRange } from "./master/IncomeRange";
 // Core Models
 import { User } from "./User";
 import { UserProfile } from "./UserProfile";
-import { PartnerPreference } from "./PartnerPreference";
+import { UserPreference } from "./UserPreference";
 import { UserPhoto } from "./UserPhoto";
 import { UserDraft } from "./UserDraft";
+import { FamilyDetails } from "./FamilyDetails";
+import { HoroscopeDetails } from "./HoroscopeDetails";
+import { LocationLifestyle } from "./LocationLifestyle";
+import { EducationCareer } from "./EducationCareer";
+import { Badge } from "./Badge";
 
 // Action Models
 import { Interest } from "./Interest";
@@ -32,6 +37,22 @@ import { Payment } from "./Payment";
 // Moderation
 import { Block, Report } from "./Moderation";
 import { SuccessStory } from "./SuccessStory";
+
+// Associations
+UserProfile.hasOne(FamilyDetails, { foreignKey: "userProfileId" });
+FamilyDetails.belongsTo(UserProfile, { foreignKey: "userProfileId" });
+
+UserProfile.hasOne(HoroscopeDetails, { foreignKey: "userProfileId" });
+HoroscopeDetails.belongsTo(UserProfile, { foreignKey: "userProfileId" });
+
+UserProfile.hasOne(LocationLifestyle, { foreignKey: "userProfileId" });
+LocationLifestyle.belongsTo(UserProfile, { foreignKey: "userProfileId" });
+
+UserProfile.hasOne(EducationCareer, { foreignKey: "userProfileId" });
+EducationCareer.belongsTo(UserProfile, { foreignKey: "userProfileId" });
+
+UserProfile.hasOne(Badge, { foreignKey: "userProfileId" });
+Badge.belongsTo(UserProfile, { foreignKey: "userProfileId" });
 
 export {
   sequelize,
@@ -49,9 +70,14 @@ export {
   IncomeRange,
   User,
   UserProfile,
-  PartnerPreference,
+  UserPreference,
   UserPhoto,
   UserDraft,
+  FamilyDetails,
+  HoroscopeDetails,
+  LocationLifestyle,
+  EducationCareer,
+  Badge,
   Interest,
   Match,
   Message,

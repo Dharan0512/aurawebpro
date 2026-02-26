@@ -25,7 +25,10 @@ export function useAuth() {
     }
   };
 
-  const register = async (userData: any) => {
+  const register = async (
+    userData: any,
+    redirectPath: string | null = "/onboarding",
+  ) => {
     setLoading(true);
     setError(null);
     try {
@@ -35,9 +38,11 @@ export function useAuth() {
       });
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
-      router.push("/onboarding");
+      if (redirectPath) router.push(redirectPath);
+      return data;
     } catch (err: any) {
       setError(err.message);
+      throw err;
     } finally {
       setLoading(false);
     }

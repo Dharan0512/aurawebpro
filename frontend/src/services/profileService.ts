@@ -34,4 +34,18 @@ export const profileService = {
     const response = await apiClient.delete(`/profile/photos/${photoId}`);
     return response.data;
   },
+
+  uploadHoroscope: async (formData: FormData) => {
+    const response = await apiClient.post("/profile/horoscope", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  },
+
+  deleteHoroscope: async () => {
+    const response = await apiClient.delete("/profile/horoscope");
+    return response.data;
+  },
 };

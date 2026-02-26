@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useState, useEffect, Fragment } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { profileService } from "@/services/profileService";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -35,12 +37,15 @@ import {
   CheckCircleIcon,
   ChevronRightIcon,
   ChevronLeftIcon,
+  PhotoIcon,
+  DocumentArrowUpIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 
 const registerSchema = z.object({
-  // Step 1
+  // Step 1: Basic Identity
   createdFor: z.enum([
-    "Myself",
+    "Self",
     "Daughter",
     "Son",
     "Sister",
@@ -52,95 +57,109 @@ const registerSchema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
   countryCodeId: z
     .union([z.number(), z.string()])
-    .refine((val) => val !== "", "Country code is required"),
+    .refine((val) => val !== "", "Required"),
   mobile: z
     .string()
     .regex(/^\d+$/, "Only numbers allowed")
-    .min(5, "Invalid mobile number"),
+    .min(10, "10 digits required"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Min 6 characters"),
 
-  // Step 2
+  // Step 2: Personal Background
   dobDay: z.string().min(1, "Day required"),
   dobMonth: z.string().min(1, "Month required"),
   dobYear: z.string().min(4, "Year required"),
-  motherTongueId: z
-    .union([z.number(), z.string()])
-    .refine((val) => val !== "", "Mother Tongue is required"),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-
-  // Step 3
   heightCm: z
     .union([z.number(), z.string()])
     .refine((val) => val !== "", "Height is required"),
-  physicalStatus: z.enum(["Normal", "Physically Challenged"]),
   maritalStatus: z.enum([
     "Never Married",
+    "Divorced",
     "Widowed",
     "Awaiting Divorce",
-    "Divorced",
   ]),
-  childrenCount: z.union([z.number(), z.string()]).optional(),
+  motherTongueId: z
+    .union([z.number(), z.string()])
+    .refine((val) => val !== "", "Required"),
   religionId: z
     .union([z.number(), z.string()])
-    .refine((val) => val !== "", "Religion is required"),
+    .refine((val) => val !== "", "Required"),
   casteId: z.union([z.number(), z.string()]).optional(),
   subcaste: z.string().optional(),
+  complexion: z.string().optional(),
+  physicalStatus: z.enum(["Normal", "Physically Challenged"]),
+  shortBio: z.string().min(30, "Please write at least 30 characters"),
 
-  // Step 4
-  countryId: z
-    .union([z.number(), z.string()])
-    .refine((val) => val !== "", "Country is required"),
-  stateId: z
-    .union([z.number(), z.string()])
-    .refine((val) => val !== "", "State is required"),
-  cityId: z
-    .union([z.number(), z.string()])
-    .refine((val) => val !== "", "City is required"),
-
-  // Step 5
-  educationId: z
-    .union([z.number(), z.string()])
-    .refine((val) => val !== "", "Education is required"),
-  employmentTypeId: z
-    .union([z.number(), z.string()])
-    .refine((val) => val !== "", "Employment Type is required"),
-  occupationId: z
-    .union([z.number(), z.string()])
-    .refine((val) => val !== "", "Occupation is required"),
-  incomeCurrencyId: z
-    .union([z.number(), z.string()])
-    .refine((val) => val !== "", "Currency is required"),
-  incomeRangeId: z
-    .union([z.number(), z.string()])
-    .refine((val) => val !== "", "Income Range is required"),
-
-  // Step 6
+  // Step 3: Family Details
+  fatherName: z.string().optional(),
+  fatherOccupation: z.string().optional(),
+  motherName: z.string().optional(),
+  motherOccupation: z.string().optional(),
+  familyType: z.enum(["Joint", "Nuclear", "Other"]).optional(),
   familyStatus: z
     .enum(["Middle Class", "Upper Middle Class", "Rich", "Affluent"])
     .optional(),
-  aboutMe: z
-    .string()
-    .min(20, "Please write at least 20 characters about yourself"),
+  siblingsCount: z.union([z.number(), z.string()]).optional(),
+  ownHouse: z.boolean().optional(),
+  nativeDistrict: z.string().optional(),
 
-  // Step 7 (Lifestyle - NEW)
+  // Step 3A: Horoscope
+  star: z.string().optional(),
+  rasi: z.string().optional(),
+  laknam: z.string().optional(),
+  gothram: z.string().optional(),
+  sevvaiDhosham: z.enum(["Yes", "No", "Don't Know"]).optional(),
+  rahuKetuDhosham: z.enum(["Yes", "No", "Don't Know"]).optional(),
+  birthTime: z.string().optional(),
+  birthPlace: z.string().optional(),
+
+  // Step 4: Location & Lifestyle
+  country: z.string().optional(),
+  state: z.string().optional(),
+  city: z.string().optional(),
+  relocatePreference: z.enum(["Yes", "No", "Flexible"]).optional(),
   diet: z.enum(["Veg", "Non-veg", "Eggetarian", "Vegan"]),
   drink: z.enum(["Yes", "No", "Occasionally"]),
   smoke: z.enum(["Yes", "No", "Occasionally"]),
-  fitness: z.enum(["Regular", "Occasional", "Not at all"]),
-  spirituality: z.enum([
-    "Very Spiritual",
-    "Moderately Spiritual",
-    "Not Spiritual",
-  ]),
-  ambition: z.enum(["High", "Moderate", "Low"]),
-  childrenPreference: z.enum(["Yes", "No", "Flexible"]),
-  careerAfterMarriage: z.enum(["Yes", "No", "Flexible"]),
-  relocation: z.enum(["Yes", "No", "Flexible"]),
+  fitnessLevel: z.enum(["Regular", "Occasional", "Not at all"]),
+  languages: z.array(z.string()).optional(),
+  hobbies: z.array(z.string()).optional(),
+
+  // Step 5: Education & Career
+  highestEducation: z.string().min(2, "Education required"),
+  fieldOfStudy: z.string().optional(),
+  college: z.string().optional(),
+  employmentType: z.string().optional(),
+  companyName: z.string().optional(),
+  designation: z.string().optional(),
+  incomeRange: z.string().optional(),
+  exactIncome: z.union([z.number(), z.string()]).optional(),
+  careerPlanAfterMarriage: z.string().optional(),
+
+  // Step 6: Values & Preferences
+  ambition: z.number().min(1).max(5).optional(),
+  familyOrientation: z.number().min(1).max(5).optional(),
+  emotionalStability: z.number().min(1).max(5).optional(),
+  communicationStyle: z.number().min(1).max(5).optional(),
+  spiritualInclination: z.number().min(1).max(5).optional(),
+
+  partnerAgeMin: z.union([z.number(), z.string()]).optional(),
+  partnerAgeMax: z.union([z.number(), z.string()]).optional(),
+  partnerHeightMin: z.union([z.number(), z.string()]).optional(),
+  partnerHeightMax: z.union([z.number(), z.string()]).optional(),
+  partnerMaritalStatus: z.string().optional(),
+  preferredLocation: z.string().optional(),
+  preferredEducation: z.string().optional(),
+  preferredIncomeRange: z.string().optional(),
+
+  // Step 7: Visibility
+  profileVisibility: z.enum(["Public", "Members Only", "Hidden"]).optional(),
 });
 
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
+  const router = useRouter();
   const { register: registerAuth, loading, error } = useAuth();
   const [step, setStep] = useState(1);
   const [countries, setCountries] = useState<Country[]>([]);
@@ -160,6 +179,71 @@ export default function RegisterPage() {
   const [otpInput, setOtpInput] = useState("");
   const [otpError, setOtpError] = useState("");
 
+  const [uploadedPhotos, setUploadedPhotos] = useState<
+    { id: string; url: string }[]
+  >([]);
+  const [horoscopeImage, setHoroscopeImage] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("photo", file);
+
+    try {
+      const result = await profileService.uploadPhotos(formData);
+      setUploadedPhotos((prev) => [
+        ...prev,
+        { id: result.photo.id, url: result.photo.url },
+      ]);
+    } catch (err) {
+      console.error("Photo upload error:", err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handlePhotoDelete = async (photoId: string) => {
+    try {
+      await profileService.deletePhoto(photoId);
+      setUploadedPhotos((prev) => prev.filter((p) => p.id !== photoId));
+    } catch (err) {
+      console.error("Photo delete error:", err);
+    }
+  };
+
+  const handleHoroscopeUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("horoscope", file);
+
+    try {
+      const result = await profileService.uploadHoroscope(formData);
+      setHoroscopeImage(result.horoscope.horoscopeImageUrl);
+    } catch (err) {
+      console.error("Horoscope upload error:", err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleHoroscopeDelete = async () => {
+    try {
+      await profileService.deleteHoroscope();
+      setHoroscopeImage(null);
+    } catch (err) {
+      console.error("Horoscope delete error:", err);
+    }
+  };
+
   const {
     register,
     handleSubmit,
@@ -170,42 +254,80 @@ export default function RegisterPage() {
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      createdFor: "Myself",
+      createdFor: "Self",
       gender: "Male",
       firstName: "",
       countryCodeId: "+91",
       mobile: "",
+      email: "",
+      password: "",
       dobDay: "",
       dobMonth: "",
       dobYear: "",
-      motherTongueId: "",
-      email: "",
-      password: "",
       heightCm: "",
-      physicalStatus: "Normal",
       maritalStatus: "Never Married",
-      childrenCount: "",
+      motherTongueId: "",
+      religionId: "",
       casteId: "",
       subcaste: "",
-      countryId: "",
-      stateId: "",
-      cityId: "",
-      educationId: "",
-      employmentTypeId: "",
-      occupationId: "",
-      incomeCurrencyId: "",
-      incomeRangeId: "",
+      complexion: "",
+      physicalStatus: "Normal",
+      shortBio: "",
+      // Family
+      fatherName: "",
+      fatherOccupation: "",
+      motherName: "",
+      motherOccupation: "",
+      familyType: "Nuclear",
       familyStatus: "Middle Class",
-      aboutMe: "",
+      siblingsCount: "0",
+      ownHouse: false,
+      nativeDistrict: "",
+      // Horoscope
+      star: "",
+      rasi: "",
+      laknam: "",
+      gothram: "",
+      sevvaiDhosham: "No",
+      rahuKetuDhosham: "No",
+      birthTime: "",
+      birthPlace: "",
+      // Location & Lifestyle
+      country: "India",
+      state: "Tamil Nadu",
+      city: "",
+      relocatePreference: "Flexible",
       diet: "Veg",
       drink: "No",
       smoke: "No",
-      fitness: "Occasional",
-      spirituality: "Moderately Spiritual",
-      ambition: "Moderate",
-      childrenPreference: "Flexible",
-      careerAfterMarriage: "Yes",
-      relocation: "Flexible",
+      fitnessLevel: "Occasional",
+      languages: [],
+      hobbies: [],
+      // Education & Career
+      highestEducation: "",
+      fieldOfStudy: "",
+      college: "",
+      employmentType: "",
+      companyName: "",
+      designation: "",
+      incomeRange: "",
+      exactIncome: "",
+      careerPlanAfterMarriage: "",
+      // Values & Preferences
+      ambition: 3,
+      familyOrientation: 3,
+      emotionalStability: 3,
+      communicationStyle: 3,
+      spiritualInclination: 3,
+      partnerAgeMin: 21,
+      partnerAgeMax: 35,
+      partnerHeightMin: 150,
+      partnerHeightMax: 190,
+      partnerMaritalStatus: "Never Married",
+      preferredLocation: "Tamil Nadu",
+      preferredEducation: "",
+      preferredIncomeRange: "",
+      profileVisibility: "Members Only",
     },
     mode: "onTouched",
   });
@@ -328,37 +450,77 @@ export default function RegisterPage() {
     }
   };
 
+  const handleStep1Register = async () => {
+    const isValid = await trigger(["firstName", "email", "password", "mobile"]);
+    if (!isValid) return;
+
+    // Detect existing session to avoid "User Already Exists" error on back-navigation
+    if (localStorage.getItem("token")) {
+      setIsOtpModalOpen(true);
+      return;
+    }
+
+    try {
+      const formData = control._formValues;
+      await registerAuth(
+        {
+          email: formData.email,
+          password: formData.password,
+          firstName: formData.firstName,
+          mobile: formData.mobile,
+          createdFor: formData.createdFor,
+          gender: formData.gender,
+          dob:
+            formData.dobYear && formData.dobMonth && formData.dobDay
+              ? `${formData.dobYear}-${formData.dobMonth.padStart(2, "0")}-${formData.dobDay.padStart(2, "0")}`
+              : null,
+        },
+        null,
+      );
+
+      // If success, move to next step
+      setIsOtpModalOpen(true); // Open OTP modal as requested
+    } catch (err) {
+      // Error handled by useAuth hook's error state
+      console.error("Registration error:", err);
+    }
+  };
+
   const onSubmit = async (data: RegisterFormData) => {
-    const dob = `${data.dobYear}-${data.dobMonth.padStart(2, "0")}-${data.dobDay.padStart(2, "0")}`;
-    await registerAuth({
-      ...data,
-      dob,
-      countryId: Number(data.countryId),
-      countryCodeId: Number(data.countryCodeId),
-      motherTongueId: Number(data.motherTongueId),
-      heightCm: Number(data.heightCm),
-      religionId: Number(data.religionId),
-      casteId:
-        data.casteId && data.casteId !== "0" ? Number(data.casteId) : undefined,
-      stateId: Number(data.stateId),
-      cityId: Number(data.cityId),
-      educationId: Number(data.educationId),
-      employmentTypeId: Number(data.employmentTypeId),
-      occupationId: Number(data.occupationId),
-      incomeCurrencyId: Number(data.incomeCurrencyId),
-      incomeRangeId: Number(data.incomeRangeId),
-      childrenCount: data.childrenCount ? Number(data.childrenCount) : 0,
-    });
+    try {
+      // Final synchronization to all 8 tables
+      const payload = {
+        ...data,
+        dob:
+          data.dobYear && data.dobMonth && data.dobDay
+            ? `${data.dobYear}-${data.dobMonth.padStart(2, "0")}-${data.dobDay.padStart(2, "0")}`
+            : null,
+        motherTongueId: Number(data.motherTongueId),
+        religionId: Number(data.religionId),
+        casteId:
+          data.casteId && data.casteId !== "0" && data.casteId !== ""
+            ? Number(data.casteId)
+            : null,
+        heightCm: Number(data.heightCm),
+        partnerAgeMin: Number(data.partnerAgeMin),
+        partnerAgeMax: Number(data.partnerAgeMax),
+      };
+
+      await profileService.updateProfile(payload);
+      router.push("/dashboard");
+    } catch (err) {
+      console.error("Final submission error:", err);
+    }
   };
 
   const steps = [
     { id: 1, name: "Identity", icon: UserCircleIcon },
-    { id: 2, name: "Account", icon: LockClosedIcon },
-    { id: 3, name: "Culture", icon: HeartIcon },
-    { id: 4, name: "Location", icon: MapPinIcon },
+    { id: 2, name: "Background", icon: SparklesIcon },
+    { id: 3, name: "Heritage", icon: StarIcon },
+    { id: 4, name: "Lifestyle", icon: MapPinIcon },
     { id: 5, name: "Career", icon: AcademicCapIcon },
-    { id: 6, name: "Family", icon: StarIcon },
-    { id: 7, name: "Lifestyle", icon: SparklesIcon },
+    { id: 6, name: "Values", icon: HeartIcon },
+    { id: 7, name: "Finish", icon: CheckCircleIcon },
   ];
 
   return (
@@ -527,9 +689,59 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {/* Step 1: Identity */}
+            {/* Step 1: Basic Identity */}
             {step === 1 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-10 duration-500">
+                {/* Photo Upload Section */}
+                <div className="pb-6 border-b border-purple-500/10">
+                  <label className="block text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                    <PhotoIcon className="w-5 h-5 text-purple-400" />
+                    Profile Photos (Min 1 required)
+                  </label>
+                  <div className="flex flex-wrap gap-4">
+                    {uploadedPhotos.map((photo) => (
+                      <div
+                        key={photo.id}
+                        className="relative w-24 h-24 rounded-2xl overflow-hidden border border-purple-500/20 group"
+                      >
+                        <img
+                          src={photo.url}
+                          alt="Profile"
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handlePhotoDelete(photo.id)}
+                          className="absolute top-1 right-1 p-1 bg-rose-500 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <XMarkIcon className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    {uploadedPhotos.length < 5 && (
+                      <label className="w-24 h-24 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer hover:border-purple-500/50 transition-all bg-slate-900/50">
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={handlePhotoUpload}
+                          accept="image/*"
+                          disabled={uploading}
+                        />
+                        {uploading ? (
+                          <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <>
+                            <PhotoIcon className="w-8 h-8 text-slate-600 mb-1" />
+                            <span className="text-[10px] font-bold text-slate-500">
+                              Upload
+                            </span>
+                          </>
+                        )}
+                      </label>
+                    )}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="col-span-full">
                     <label className="block text-sm font-bold text-slate-300 mb-2">
@@ -541,7 +753,7 @@ export default function RegisterPage() {
                       render={({ field }) => (
                         <PremiumSelect
                           options={[
-                            "Myself",
+                            "Self",
                             "Daughter",
                             "Son",
                             "Sister",
@@ -613,11 +825,6 @@ export default function RegisterPage() {
                           />
                         )}
                       />
-                      {errors.countryCodeId && (
-                        <p className="mt-1 text-xs text-rose-400">
-                          {errors.countryCodeId.message}
-                        </p>
-                      )}
                     </div>
                     <div className="col-span-2">
                       <label className="block text-sm font-bold text-slate-300 mb-2">
@@ -625,57 +832,60 @@ export default function RegisterPage() {
                       </label>
                       <input
                         type="tel"
-                        {...register("mobile", {
-                          onChange: (e) => {
-                            e.target.value = e.target.value.replace(
-                              /[^0-9]/g,
-                              "",
-                            );
-                          },
-                        })}
+                        {...register("mobile")}
                         placeholder="Phone number"
                         className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none placeholder:text-slate-600 transition-all"
                       />
-                      {errors.mobile && (
-                        <p className="mt-1 text-xs text-rose-400">
-                          {errors.mobile.message}
-                        </p>
-                      )}
+                    </div>
+                  </div>
+                  <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Email Address
+                      </label>
+                      <input
+                        type="email"
+                        {...register("email")}
+                        placeholder="name@example.com"
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none placeholder:text-slate-600 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Password
+                      </label>
+                      <input
+                        type="password"
+                        {...register("password")}
+                        placeholder="••••••••"
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none placeholder:text-slate-600 transition-all"
+                      />
                     </div>
                   </div>
                 </div>
                 <div className="flex justify-end pt-6">
                   <button
                     type="button"
-                    onClick={() =>
-                      nextStep([
-                        "createdFor",
-                        "gender",
-                        "firstName",
-                        "countryCodeId",
-                        "mobile",
-                      ]).then((isValid) => {
-                        if (isValid) setIsOtpModalOpen(true);
-                      })
-                    }
+                    onClick={handleStep1Register}
                     className="group px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black shadow-[0_10px_20px_rgba(168,85,247,0.3)] hover:scale-[1.05] active:scale-95 transition-all flex items-center space-x-2 outline-none"
                   >
-                    <span>Verify Mobile</span>
+                    <span>Verify & Continue</span>
                     <ChevronRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Step 2: Account */}
+            {/* Step 2: Personal Background */}
             {step === 2 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-10 duration-500">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="col-span-full">
                     <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Date of Birth
+                      Date of Birth (Legacy Age Verification)
                     </label>
                     <div className="grid grid-cols-3 gap-4">
+                      {/* ... DOB Controls ... */}
                       <Controller
                         control={control}
                         name="dobDay"
@@ -732,105 +942,9 @@ export default function RegisterPage() {
                         )}
                       />
                     </div>
-                    {(errors.dobDay || errors.dobMonth || errors.dobYear) && (
-                      <p className="mt-2 text-xs text-rose-400">
-                        Please complete your birth date (Must be 18+)
-                      </p>
-                    )}
                   </div>
-                  <div className="col-span-full">
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Mother Tongue
-                    </label>
-                    <Controller
-                      control={control}
-                      name="motherTongueId"
-                      render={({ field }) => (
-                        <SearchableDropdown
-                          options={motherTongues}
-                          value={
-                            motherTongues.find((m) => m.id === field.value) ||
-                            null
-                          }
-                          onChange={(val) => field.onChange(val?.id || "")}
-                          placeholder="Search language..."
-                        />
-                      )}
-                    />
-                    {errors.motherTongueId && (
-                      <p className="mt-1 text-xs text-rose-400">
-                        {errors.motherTongueId.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="col-span-full">
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Professional Email
-                    </label>
-                    <input
-                      type="email"
-                      {...register("email")}
-                      placeholder="name@luxury.com"
-                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none placeholder:text-slate-600 transition-all"
-                    />
-                    {errors.email && (
-                      <p className="mt-1 text-xs text-rose-400">
-                        {errors.email.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="col-span-full">
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Security Password
-                    </label>
-                    <input
-                      type="password"
-                      {...register("password")}
-                      placeholder="••••••••"
-                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none placeholder:text-slate-600 transition-all"
-                    />
-                    {errors.password && (
-                      <p className="mt-1 text-xs text-rose-400">
-                        {errors.password.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-between pt-6">
-                  <button
-                    type="button"
-                    onClick={prevStep}
-                    className="px-8 py-4 bg-slate-800 text-slate-300 rounded-2xl font-bold hover:bg-slate-700 transition-all flex items-center space-x-2"
-                  >
-                    <ChevronLeftIcon className="w-4 h-4" />
-                    <span>Previous</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      nextStep([
-                        "dobDay",
-                        "dobMonth",
-                        "dobYear",
-                        "motherTongueId",
-                        "email",
-                        "password",
-                      ])
-                    }
-                    className="group px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black shadow-[0_10px_20px_rgba(168,85,247,0.3)] hover:scale-[1.05] active:scale-95 transition-all flex items-center space-x-2"
-                  >
-                    <span>Next Phase</span>
-                    <ChevronRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
-              </div>
-            )}
 
-            {/* Step 3: Culture */}
-            {step === 3 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-right-10 duration-500">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="col-span-full">
+                  <div>
                     <label className="block text-sm font-bold text-slate-300 mb-2">
                       Height
                     </label>
@@ -850,12 +964,8 @@ export default function RegisterPage() {
                         />
                       )}
                     />
-                    {errors.heightCm && (
-                      <p className="mt-1 text-xs text-rose-400">
-                        {errors.heightCm.message}
-                      </p>
-                    )}
                   </div>
+
                   <div>
                     <label className="block text-sm font-bold text-slate-300 mb-2">
                       Marital Status
@@ -867,9 +977,9 @@ export default function RegisterPage() {
                         <PremiumSelect
                           options={[
                             "Never Married",
+                            "Divorced",
                             "Widowed",
                             "Awaiting Divorce",
-                            "Divorced",
                           ].map((opt) => ({ id: opt, name: opt }))}
                           value={field.value}
                           onChange={field.onChange}
@@ -877,55 +987,8 @@ export default function RegisterPage() {
                       )}
                     />
                   </div>
-                  {watchedMaritalStatus !== "Never Married" && (
-                    <div className="animate-in fade-in zoom-in-95 duration-300">
-                      <label className="block text-sm font-bold text-slate-300 mb-2">
-                        Number of Children
-                      </label>
-                      <Controller
-                        control={control}
-                        name="childrenCount"
-                        render={({ field }) => (
-                          <PremiumSelect
-                            options={["0", "1", "2", "3", "4+"].map((cnt) => ({
-                              id: cnt,
-                              name: cnt,
-                            }))}
-                            value={String(field.value || "0")}
-                            onChange={field.onChange}
-                          />
-                        )}
-                      />
-                      {errors.childrenCount && (
-                        <p className="mt-1 text-xs text-rose-400">
-                          {errors.childrenCount.message}
-                        </p>
-                      )}
-                    </div>
-                  )}
+
                   <div>
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Physical Status
-                    </label>
-                    <Controller
-                      control={control}
-                      name="physicalStatus"
-                      render={({ field }) => (
-                        <PremiumSelect
-                          options={[
-                            { id: "Normal", name: "Normal" },
-                            {
-                              id: "Physically Challenged",
-                              name: "Physically Challenged",
-                            },
-                          ]}
-                          value={field.value}
-                          onChange={field.onChange}
-                        />
-                      )}
-                    />
-                  </div>
-                  <div className="col-span-full">
                     <label className="block text-sm font-bold text-slate-300 mb-2">
                       Religion
                     </label>
@@ -933,326 +996,145 @@ export default function RegisterPage() {
                       control={control}
                       name="religionId"
                       render={({ field }) => (
-                        <SearchableDropdown
-                          options={religions}
-                          value={
-                            religions.find((r) => r.id === field.value) || null
-                          }
-                          onChange={(val) => field.onChange(val?.id || "")}
-                          placeholder="Path to faith..."
+                        <PremiumSelect
+                          options={religions.map((r) => ({
+                            id: String(r.id),
+                            name: r.name,
+                          }))}
+                          value={String(field.value)}
+                          onChange={field.onChange}
                         />
                       )}
                     />
-                    {errors.religionId && (
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      Mother Tongue
+                    </label>
+                    <Controller
+                      control={control}
+                      name="motherTongueId"
+                      render={({ field }) => (
+                        <SearchableDropdown
+                          options={motherTongues}
+                          value={
+                            motherTongues.find((m) => m.id === field.value) ||
+                            null
+                          }
+                          onChange={(val) => field.onChange(val?.id || "")}
+                          placeholder="Search language..."
+                        />
+                      )}
+                    />
+                  </div>
+
+                  <div className="col-span-full">
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      About Me / Bio
+                    </label>
+                    <textarea
+                      {...register("shortBio")}
+                      rows={4}
+                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none placeholder:text-slate-600 transition-all resize-none"
+                      placeholder="Tell us about yourself, your values, and what you're looking for..."
+                    />
+                    {errors.shortBio && (
                       <p className="mt-1 text-xs text-rose-400">
-                        {errors.religionId.message}
+                        {errors.shortBio.message}
                       </p>
                     )}
                   </div>
+                </div>
+
+                <div className="flex justify-between pt-6">
+                  <button
+                    type="button"
+                    onClick={prevStep}
+                    className="px-8 py-4 bg-slate-800 text-slate-300 rounded-2xl font-bold hover:bg-slate-700 transition-all flex items-center space-x-2"
+                  >
+                    <ChevronLeftIcon className="w-4 h-4" />
+                    <span>Previous</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      nextStep([
+                        "dobDay",
+                        "dobMonth",
+                        "dobYear",
+                        "heightCm",
+                        "maritalStatus",
+                        "religionId",
+                        "motherTongueId",
+                        "shortBio",
+                      ])
+                    }
+                    className="group px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black shadow-[0_10px_20px_rgba(168,85,247,0.3)] hover:scale-[1.05] active:scale-95 transition-all flex items-center space-x-2"
+                  >
+                    <span>Next Phase</span>
+                    <ChevronRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Heritage (Family & Horoscope) */}
+            {step === 3 && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-right-10 duration-500">
+                <div className="pb-4 border-b border-purple-500/20">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <SparklesIcon className="w-5 h-5 text-purple-400" />
+                    Family Roots
+                  </h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div>
                     <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Caste / Root
-                    </label>
-                    <Controller
-                      control={control}
-                      name="casteId"
-                      render={({ field }) => (
-                        <SearchableDropdown
-                          options={castes}
-                          value={
-                            castes.find((c) => c.id === field.value) || null
-                          }
-                          onChange={(val) => field.onChange(val?.id || "")}
-                          placeholder="Seek root..."
-                          disabled={!watchedReligionId}
-                        />
-                      )}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Subcaste (Optional)
+                      Father's Name
                     </label>
                     <input
                       type="text"
-                      {...register("subcaste")}
-                      placeholder="Legacy niche"
-                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none placeholder:text-slate-600"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-between pt-6">
-                  <button
-                    type="button"
-                    onClick={prevStep}
-                    className="px-8 py-4 bg-slate-800 text-slate-300 rounded-2xl font-bold hover:bg-slate-700 transition-all flex items-center space-x-2"
-                  >
-                    <ChevronLeftIcon className="w-4 h-4" />
-                    <span>Previous</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      nextStep([
-                        "heightCm",
-                        "physicalStatus",
-                        "maritalStatus",
-                        "childrenCount",
-                        "religionId",
-                      ])
-                    }
-                    className="group px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black shadow-[0_10px_20px_rgba(168,85,247,0.3)] hover:scale-[1.05] active:scale-95 transition-all flex items-center space-x-2"
-                  >
-                    <span>Next Phase</span>
-                    <ChevronRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 4: Location */}
-            {step === 4 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-right-10 duration-500">
-                <div className="grid grid-cols-1 gap-8">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Country of Residence
-                    </label>
-                    <Controller
-                      control={control}
-                      name="countryId"
-                      render={({ field }) => (
-                        <SearchableDropdown
-                          options={countries}
-                          value={
-                            countries.find((c) => c.id === field.value) || null
-                          }
-                          onChange={(val) => field.onChange(val?.id || "")}
-                          placeholder="Global region..."
-                        />
-                      )}
+                      {...register("fatherName")}
+                      placeholder="Father's full name"
+                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-300 mb-2">
-                      State / Province
+                      Mother's Name
                     </label>
-                    <Controller
-                      control={control}
-                      name="stateId"
-                      render={({ field }) => (
-                        <SearchableDropdown
-                          options={statesList}
-                          value={
-                            statesList.find((s) => s.id === field.value) || null
-                          }
-                          onChange={(val) => field.onChange(val?.id || "")}
-                          placeholder="State territory..."
-                          disabled={!watchedCountryId}
-                        />
-                      )}
+                    <input
+                      type="text"
+                      {...register("motherName")}
+                      placeholder="Mother's full name"
+                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-300 mb-2">
-                      City / Urban Base
+                      Native District
                     </label>
-                    <Controller
-                      control={control}
-                      name="cityId"
-                      render={({ field }) => (
-                        <SearchableDropdown
-                          options={citiesList}
-                          value={
-                            citiesList.find((c) => c.id === field.value) || null
-                          }
-                          onChange={(val) => field.onChange(val?.id || "")}
-                          placeholder="Home base..."
-                          disabled={!watchedStateId}
-                        />
-                      )}
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-between pt-6">
-                  <button
-                    type="button"
-                    onClick={prevStep}
-                    className="px-8 py-4 bg-slate-800 text-slate-300 rounded-2xl font-bold hover:bg-slate-700 transition-all flex items-center space-x-2"
-                  >
-                    <ChevronLeftIcon className="w-4 h-4" />
-                    <span>Previous</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => nextStep(["countryId", "stateId", "cityId"])}
-                    className="group px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black shadow-[0_10px_20px_rgba(168,85,247,0.3)] hover:scale-[1.05] active:scale-95 transition-all flex items-center space-x-2"
-                  >
-                    <span>Next Phase</span>
-                    <ChevronRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 5: Career */}
-            {step === 5 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-right-10 duration-500">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="col-span-full">
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Education Background
-                    </label>
-                    <Controller
-                      control={control}
-                      name="educationId"
-                      render={({ field }) => (
-                        <SearchableDropdown
-                          options={educations}
-                          value={
-                            educations.find((e) => e.id === field.value) || null
-                          }
-                          onChange={(val) => field.onChange(val?.id || "")}
-                          placeholder="Primary qualification..."
-                        />
-                      )}
+                    <input
+                      type="text"
+                      {...register("nativeDistrict")}
+                      placeholder="e.g. Madurai, Tanjore"
+                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Employment
+                      Family Type
                     </label>
                     <Controller
                       control={control}
-                      name="employmentTypeId"
-                      render={({ field }) => (
-                        <SearchableDropdown
-                          options={employmentTypes}
-                          value={
-                            employmentTypes.find((e) => e.id === field.value) ||
-                            null
-                          }
-                          onChange={(val) => field.onChange(val?.id || "")}
-                          placeholder="Domain..."
-                        />
-                      )}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Professional Role
-                    </label>
-                    <Controller
-                      control={control}
-                      name="occupationId"
-                      render={({ field }) => (
-                        <SearchableDropdown
-                          options={occupations}
-                          value={
-                            occupations.find((o) => o.id === field.value) ||
-                            null
-                          }
-                          onChange={(val) => field.onChange(val?.id || "")}
-                          placeholder="Designation..."
-                          disabled={!watchedEmploymentTypeId}
-                        />
-                      )}
-                    />
-                  </div>
-                  <div className="col-span-full grid grid-cols-3 gap-4">
-                    <div className="col-span-1">
-                      <label className="block text-sm font-bold text-slate-300 mb-2">
-                        Curr
-                      </label>
-                      <Controller
-                        control={control}
-                        name="incomeCurrencyId"
-                        render={({ field }) => (
-                          <SearchableDropdown
-                            options={currencies}
-                            value={
-                              currencies.find((c) => c.id === field.value) ||
-                              null
-                            }
-                            onChange={(val) => field.onChange(val?.id || "")}
-                            displayKey="name"
-                            placeholder="$"
-                          />
-                        )}
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-sm font-bold text-slate-300 mb-2">
-                        Annual Wealth Range
-                      </label>
-                      <Controller
-                        control={control}
-                        name="incomeRangeId"
-                        render={({ field }) => (
-                          <SearchableDropdown
-                            options={incomeRanges}
-                            value={
-                              incomeRanges.find((i) => i.id === field.value) ||
-                              null
-                            }
-                            onChange={(val) => field.onChange(val?.id || "")}
-                            displayKey="displayLabel"
-                            placeholder="Bracket..."
-                            disabled={!watchedCurrencyId}
-                          />
-                        )}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="flex justify-between pt-6">
-                  <button
-                    type="button"
-                    onClick={prevStep}
-                    className="px-8 py-4 bg-slate-800 text-slate-300 rounded-2xl font-bold hover:bg-slate-700 transition-all flex items-center space-x-2"
-                  >
-                    <ChevronLeftIcon className="w-4 h-4" />
-                    <span>Previous</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      nextStep([
-                        "educationId",
-                        "employmentTypeId",
-                        "occupationId",
-                        "incomeCurrencyId",
-                        "incomeRangeId",
-                      ])
-                    }
-                    className="group px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black shadow-[0_10px_20px_rgba(168,85,247,0.3)] hover:scale-[1.05] active:scale-95 transition-all flex items-center space-x-2"
-                  >
-                    <span>Next Phase</span>
-                    <ChevronRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 6: Family */}
-            {step === 6 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-right-10 duration-500">
-                <div className="grid grid-cols-1 gap-8">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Family Class
-                    </label>
-                    <Controller
-                      control={control}
-                      name="familyStatus"
+                      name="familyType"
                       render={({ field }) => (
                         <PremiumSelect
-                          options={[
-                            "Middle Class",
-                            "Upper Middle Class",
-                            "Rich",
-                            "Affluent",
-                          ].map((opt) => ({ id: opt, name: opt }))}
+                          options={["Joint", "Nuclear", "Other"].map((opt) => ({
+                            id: opt,
+                            name: opt,
+                          }))}
                           value={field.value ?? ""}
                           onChange={field.onChange}
                         />
@@ -1261,21 +1143,129 @@ export default function RegisterPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-300 mb-2">
-                      About Your Story
+                      Caste
                     </label>
-                    <textarea
-                      {...register("aboutMe")}
-                      rows={5}
-                      placeholder="The universe needs to hear your story... (min 20 chars)"
-                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-3xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none placeholder:text-slate-600 resize-none transition-all"
+                    <Controller
+                      control={control}
+                      name="casteId"
+                      render={({ field }) => (
+                        <SearchableDropdown
+                          options={castes}
+                          value={
+                            castes.find((c) => c.id === String(field.value)) ||
+                            null
+                          }
+                          onChange={(val) => field.onChange(val?.id || "")}
+                          placeholder="Search caste..."
+                        />
+                      )}
                     />
-                    {errors.aboutMe && (
-                      <p className="mt-2 text-xs text-rose-400 font-medium">
-                        {errors.aboutMe.message}
-                      </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      Subcaste
+                    </label>
+                    <input
+                      type="text"
+                      {...register("subcaste")}
+                      placeholder="e.g. Kongu, Iyer"
+                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-6 pb-4 border-b border-purple-500/20">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <StarIcon className="w-5 h-5 text-amber-400" />
+                    Horoscope Details
+                  </h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      Star (Nakshatram)
+                    </label>
+                    <input
+                      type="text"
+                      {...register("star")}
+                      placeholder="Select or type..."
+                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      Rasi
+                    </label>
+                    <input
+                      type="text"
+                      {...register("rasi")}
+                      placeholder="Select or type..."
+                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      Sevvai/Rahu Dosham
+                    </label>
+                    <Controller
+                      control={control}
+                      name="sevvaiDhosham"
+                      render={({ field }) => (
+                        <PremiumSelect
+                          options={["No", "Yes", "Don't Know"].map((opt) => ({
+                            id: opt,
+                            name: opt,
+                          }))}
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                        />
+                      )}
+                    />
+                  </div>
+                  <div className="col-span-full">
+                    <label className="block text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                      <DocumentArrowUpIcon className="w-5 h-5 text-amber-400" />
+                      Horoscope Image
+                    </label>
+                    {horoscopeImage ? (
+                      <div className="relative w-48 h-64 rounded-2xl overflow-hidden border border-amber-500/20 group">
+                        <img
+                          src={horoscopeImage}
+                          alt="Horoscope"
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleHoroscopeDelete}
+                          className="absolute top-2 right-2 p-2 bg-rose-500 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <XMarkIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="w-full h-32 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer hover:border-amber-500/50 transition-all bg-slate-900/50">
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={handleHoroscopeUpload}
+                          accept="image/*"
+                          disabled={uploading}
+                        />
+                        {uploading ? (
+                          <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <>
+                            <DocumentArrowUpIcon className="w-10 h-10 text-slate-600 mb-2" />
+                            <span className="text-sm font-bold text-slate-500">
+                              Upload Horoscope (JPG/PNG)
+                            </span>
+                          </>
+                        )}
+                      </label>
                     )}
                   </div>
                 </div>
+
                 <div className="flex justify-between pt-6">
                   <button
                     type="button"
@@ -1287,20 +1277,65 @@ export default function RegisterPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => nextStep(["familyStatus", "aboutMe"])}
+                    onClick={() =>
+                      nextStep([
+                        "fatherName",
+                        "motherName",
+                        "nativeDistrict",
+                        "casteId",
+                        "star",
+                        "rasi",
+                        "sevvaiDhosham",
+                      ])
+                    }
                     className="group px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black shadow-[0_10px_20px_rgba(168,85,247,0.3)] hover:scale-[1.05] active:scale-95 transition-all flex items-center space-x-2"
                   >
-                    <span>Final Step</span>
+                    <span>Next Phase</span>
                     <ChevronRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Step 7: Lifestyle (NEW) */}
-            {step === 7 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-right-10 duration-500">
+            {/* Step 4: Location & Lifestyle */}
+            {step === 4 && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-right-10 duration-500">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="col-span-full grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Country
+                      </label>
+                      <input
+                        type="text"
+                        {...register("country")}
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        State
+                      </label>
+                      <input
+                        type="text"
+                        {...register("state")}
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        City
+                      </label>
+                      <input
+                        type="text"
+                        {...register("city")}
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 col-span-full border-t border-white/5"></div>
+
                   <div>
                     <label className="block text-sm font-bold text-slate-300 mb-2">
                       Dietary Choice
@@ -1324,37 +1359,16 @@ export default function RegisterPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Spiritual Essence
+                      Fitness Level
                     </label>
                     <Controller
                       control={control}
-                      name="spirituality"
+                      name="fitnessLevel"
                       render={({ field }) => (
                         <PremiumSelect
-                          options={[
-                            "Very Spiritual",
-                            "Moderately Spiritual",
-                            "Not Spiritual",
-                          ].map((opt) => ({ id: opt, name: opt }))}
-                          value={field.value}
-                          onChange={field.onChange}
-                        />
-                      )}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Drinking Habit
-                    </label>
-                    <Controller
-                      control={control}
-                      name="drink"
-                      render={({ field }) => (
-                        <PremiumSelect
-                          options={["No", "Yes", "Occasionally"].map((opt) => ({
-                            id: opt,
-                            name: opt,
-                          }))}
+                          options={["Regular", "Occasional", "Not at all"].map(
+                            (opt) => ({ id: opt, name: opt }),
+                          )}
                           value={field.value}
                           onChange={field.onChange}
                         />
@@ -1382,73 +1396,17 @@ export default function RegisterPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Ambition Level
+                      Drinking Habit
                     </label>
                     <Controller
                       control={control}
-                      name="ambition"
+                      name="drink"
                       render={({ field }) => (
                         <PremiumSelect
-                          options={["High", "Moderate", "Low"].map((opt) => ({
+                          options={["No", "Yes", "Occasionally"].map((opt) => ({
                             id: opt,
                             name: opt,
                           }))}
-                          value={field.value}
-                          onChange={field.onChange}
-                        />
-                      )}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Career Post-Marriage
-                    </label>
-                    <Controller
-                      control={control}
-                      name="careerAfterMarriage"
-                      render={({ field }) => (
-                        <PremiumSelect
-                          options={["Yes", "No", "Flexible"].map((opt) => ({
-                            id: opt,
-                            name: opt,
-                          }))}
-                          value={field.value}
-                          onChange={field.onChange}
-                        />
-                      )}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Relocation Openness
-                    </label>
-                    <Controller
-                      control={control}
-                      name="relocation"
-                      render={({ field }) => (
-                        <PremiumSelect
-                          options={["Yes", "No", "Flexible"].map((opt) => ({
-                            id: opt,
-                            name: opt,
-                          }))}
-                          value={field.value}
-                          onChange={field.onChange}
-                        />
-                      )}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Fitness Commitment
-                    </label>
-                    <Controller
-                      control={control}
-                      name="fitness"
-                      render={({ field }) => (
-                        <PremiumSelect
-                          options={["Regular", "Occasional", "Not at all"].map(
-                            (opt) => ({ id: opt, name: opt }),
-                          )}
                           value={field.value}
                           onChange={field.onChange}
                         />
@@ -1456,6 +1414,286 @@ export default function RegisterPage() {
                     />
                   </div>
                 </div>
+
+                <div className="flex justify-between pt-6">
+                  <button
+                    type="button"
+                    onClick={prevStep}
+                    className="px-8 py-4 bg-slate-800 text-slate-300 rounded-2xl font-bold hover:bg-slate-700 transition-all flex items-center space-x-2"
+                  >
+                    <ChevronLeftIcon className="w-4 h-4" />
+                    <span>Previous</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      nextStep([
+                        "country",
+                        "state",
+                        "city",
+                        "diet",
+                        "fitnessLevel",
+                        "smoke",
+                        "drink",
+                      ])
+                    }
+                    className="group px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black shadow-[0_10px_20px_rgba(168,85,247,0.3)] hover:scale-[1.05] active:scale-95 transition-all flex items-center space-x-2"
+                  >
+                    <span>Next Phase</span>
+                    <ChevronRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 5: Education & Career */}
+            {step === 5 && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-right-10 duration-500">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="col-span-full">
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      Highest Education
+                    </label>
+                    <input
+                      type="text"
+                      {...register("highestEducation")}
+                      placeholder="e.g. B.Tech Computer Science"
+                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      Employment Type
+                    </label>
+                    <Controller
+                      control={control}
+                      name="employmentType"
+                      render={({ field }) => (
+                        <PremiumSelect
+                          options={[
+                            "Government",
+                            "Private",
+                            "Business",
+                            "Self Employed",
+                            "Not Working",
+                          ].map((opt) => ({ id: opt, name: opt }))}
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                        />
+                      )}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      Designation
+                    </label>
+                    <input
+                      type="text"
+                      {...register("designation")}
+                      placeholder="e.g. Software Engineer"
+                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                    />
+                  </div>
+                  <div className="col-span-full">
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      Annual Income Range
+                    </label>
+                    <Controller
+                      control={control}
+                      name="incomeRange"
+                      render={({ field }) => (
+                        <PremiumSelect
+                          options={[
+                            "Under 3L",
+                            "3L - 6L",
+                            "6L - 10L",
+                            "10L - 15L",
+                            "15L - 25L",
+                            "25L - 50L",
+                            "50L+",
+                          ].map((opt) => ({ id: opt, name: opt }))}
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                        />
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-between pt-6">
+                  <button
+                    type="button"
+                    onClick={prevStep}
+                    className="px-8 py-4 bg-slate-800 text-slate-300 rounded-2xl font-bold hover:bg-slate-700 transition-all flex items-center space-x-2"
+                  >
+                    <ChevronLeftIcon className="w-4 h-4" />
+                    <span>Previous</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      nextStep([
+                        "highestEducation",
+                        "employmentType",
+                        "designation",
+                        "incomeRange",
+                      ])
+                    }
+                    className="group px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black shadow-[0_10px_20px_rgba(168,85,247,0.3)] hover:scale-[1.05] active:scale-95 transition-all flex items-center space-x-2"
+                  >
+                    <span>Next Phase</span>
+                    <ChevronRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 6: Values & Preferences */}
+            {step === 6 && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-right-10 duration-500">
+                <div className="grid grid-cols-1 gap-8">
+                  <div className="bg-white/5 p-6 rounded-3xl border border-white/10">
+                    <h4 className="text-white font-bold mb-6">
+                      Personal Values (1-5 Scale)
+                    </h4>
+                    <div className="space-y-6">
+                      {[
+                        { name: "ambition", label: "Career Ambition" },
+                        {
+                          name: "familyOrientation",
+                          label: "Family Orientation",
+                        },
+                        {
+                          name: "spiritualInclination",
+                          label: "Spiritual Inclination",
+                        },
+                      ].map((item) => (
+                        <div key={item.name} className="space-y-2">
+                          <div className="flex justify-between text-xs text-slate-400 mb-1">
+                            <span>Low</span>
+                            <span className="text-purple-400 font-bold">
+                              {item.label}
+                            </span>
+                            <span>High</span>
+                          </div>
+                          <Controller
+                            control={control}
+                            name={item.name as any}
+                            render={({ field }) => (
+                              <input
+                                type="range"
+                                min="1"
+                                max="5"
+                                value={field.value}
+                                onChange={(e) =>
+                                  field.onChange(parseInt(e.target.value))
+                                }
+                                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                              />
+                            )}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Preferred Partner Age (Min)
+                      </label>
+                      <input
+                        type="number"
+                        {...register("partnerAgeMin")}
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                        placeholder="21"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Preferred Partner Age (Max)
+                      </label>
+                      <input
+                        type="number"
+                        {...register("partnerAgeMax")}
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                        placeholder="35"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-between pt-6">
+                  <button
+                    type="button"
+                    onClick={prevStep}
+                    className="px-8 py-4 bg-slate-800 text-slate-300 rounded-2xl font-bold hover:bg-slate-700 transition-all flex items-center space-x-2"
+                  >
+                    <ChevronLeftIcon className="w-4 h-4" />
+                    <span>Previous</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      nextStep([
+                        "ambition",
+                        "familyOrientation",
+                        "spiritualInclination",
+                        "partnerAgeMin",
+                        "partnerAgeMax",
+                      ])
+                    }
+                    className="group px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black shadow-[0_10px_20px_rgba(168,85,247,0.3)] hover:scale-[1.05] active:scale-95 transition-all flex items-center space-x-2"
+                  >
+                    <span>Final Review</span>
+                    <ChevronRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 7: Visibility & Finish */}
+            {step === 7 && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-right-10 duration-500">
+                <div className="bg-white/5 p-8 rounded-3xl border border-white/10 text-center space-y-4">
+                  <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircleIcon className="w-12 h-12 text-purple-400" />
+                  </div>
+                  <h3 className="text-2xl font-black text-white">
+                    Legacy Complete!
+                  </h3>
+                  <p className="text-slate-400 max-w-md mx-auto">
+                    Your profile is ready for curation. Choose how you'd like to
+                    appear to the AuraWeds elite community.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      Profile Visibility
+                    </label>
+                    <Controller
+                      control={control}
+                      name="profileVisibility"
+                      render={({ field }) => (
+                        <PremiumSelect
+                          options={[
+                            { id: "Public", name: "Visible to All" },
+                            {
+                              id: "Members Only",
+                              name: "Premium Members Only",
+                            },
+                            { id: "Hidden", name: "Keep it Private for now" },
+                          ]}
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                        />
+                      )}
+                    />
+                  </div>
+                </div>
+
                 <div className="flex justify-between pt-6">
                   <button
                     type="button"

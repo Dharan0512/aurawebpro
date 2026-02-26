@@ -3,12 +3,15 @@ import bcrypt from "bcryptjs";
 import * as jsonwebtoken from "jsonwebtoken";
 import { User } from "../models/sequelize/User";
 import { UserProfile } from "../models/sequelize/UserProfile";
+import { sequelize } from "../config/db.postgres";
+import { Badge } from "../models/sequelize/Badge";
 
 export const register = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
+  const transaction = await sequelize.transaction();
   try {
     const {
       email,
@@ -17,36 +20,8 @@ export const register = async (
       firstName,
       lastName,
       gender,
-      countryCodeId,
       mobile,
       dob,
-      countryId,
-      motherTongueId,
-      heightCm,
-      physicalStatus,
-      maritalStatus,
-      childrenCount,
-      religionId,
-      casteId,
-      subcaste,
-      stateId,
-      cityId,
-      educationId,
-      employmentTypeId,
-      occupationId,
-      incomeCurrencyId,
-      incomeRangeId,
-      familyStatus,
-      aboutMe,
-      diet,
-      drink,
-      smoke,
-      fitness,
-      spirituality,
-      ambition,
-      childrenPreference,
-      careerAfterMarriage,
-      relocation,
     } = req.body;
 
     const existingUser = await User.findOne({ where: { email } });
@@ -58,62 +33,51 @@ export const register = async (
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    const newUser = await User.create({
-      email,
-      passwordHash,
-      role: "user",
-      createdFor: [
-        "Myself",
-        "Self",
-        "Parent",
-        "Guardian",
-        "Friend",
-        "Sister",
-        "Brother",
-        "Daughter",
-        "Son",
-        "Relative",
-      ].includes(createdFor)
-        ? createdFor
-        : "Self",
-      firstName,
-      lastName: lastName || null,
-      gender: ["Male", "Female", "Other"].includes(gender) ? gender : "Other",
-      countryCodeId: countryCodeId ? Number(countryCodeId) : null,
-      mobile,
-    });
+    const newUser = await User.create(
+      {
+        email,
+        passwordHash,
+        role: "user",
+        createdFor: [
+          "Self",
+          "Parent",
+          "Guardian",
+          "Friend",
+          "Sister",
+          "Brother",
+          "Daughter",
+          "Son",
+          "Relative",
+        ].includes(createdFor)
+          ? createdFor
+          : "Self",
+        firstName,
+        lastName: lastName || null,
+        gender: ["Male", "Female", "Other"].includes(gender) ? gender : "Other",
+        mobile,
+      },
+      { transaction },
+    );
 
-    await UserProfile.create({
-      userId: newUser.id,
-      dob: dob || null,
-      countryId: countryId || null,
-      motherTongueId: motherTongueId || null,
-      heightCm: heightCm || null,
-      physicalStatus: physicalStatus || "Normal",
-      maritalStatus: maritalStatus || "Never Married",
-      childrenCount: childrenCount || 0,
-      religionId: religionId || null,
-      casteId: casteId || null,
-      subcaste: subcaste || null,
-      stateId: stateId || null,
-      cityId: cityId || null,
-      educationId: educationId || null,
-      employmentTypeId: employmentTypeId || null,
-      occupationId: occupationId || null,
-      incomeCurrencyId: incomeCurrencyId || null,
-      incomeRangeId: incomeRangeId || null,
-      familyStatus: familyStatus || null,
-      aboutMe: aboutMe || null,
-      diet: diet || null,
-      drink: drink || null,
-      smoke: smoke || null,
-      fitness: fitness || null,
-      spirituality: spirituality || null,
-      ambition: ambition || null,
-      childrenPreference: childrenPreference || null,
-      careerAfterMarriage: careerAfterMarriage || null,
-      relocation: relocation || null,
-    });
+    const userProfile = await UserProfile.create(
+      {
+        userId: newUser.id,
+        dob: dob ? new Date(dob) : null,
+        profileStrength: 15, // Step 1 gives initial strength
+      },
+      { transaction },
+    );
+
+    // Initial Badge creation
+    await Badge.create(
+      {
+        userProfileId: userProfile.id,
+        mobileVerified: true, // Assuming OTP bypass for now or handled via middleware
+      },
+      { transaction },
+    );
+
+    await transaction.commit();
 
     const token = jsonwebtoken.sign(
       { id: newUser.id, role: newUser.role },
@@ -128,6 +92,7 @@ export const register = async (
       token,
     });
   } catch (error: any) {
+    await transaction.rollback();
     console.error("Register error DETAILED:", {
       message: error.message,
       stack: error.stack,
