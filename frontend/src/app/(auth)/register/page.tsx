@@ -9,6 +9,7 @@ import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import SearchableDropdown from "@/components/ui/SearchableDropdown";
+import MultiSearchableDropdown from "@/components/ui/MultiSearchableDropdown";
 import PremiumSelect from "@/components/ui/PremiumSelect";
 import {
   masterService,
@@ -42,119 +43,168 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 
-const registerSchema = z.object({
-  // Step 1: Basic Identity
-  createdFor: z.enum([
-    "Self",
-    "Daughter",
-    "Son",
-    "Sister",
-    "Brother",
-    "Relative",
-    "Friend",
-  ]),
-  gender: z.enum(["Male", "Female", "Other"]),
-  firstName: z.string().min(2, "First name must be at least 2 characters"),
-  countryCodeId: z
-    .union([z.number(), z.string()])
-    .refine((val) => val !== "", "Required"),
-  mobile: z
-    .string()
-    .regex(/^\d+$/, "Only numbers allowed")
-    .min(10, "10 digits required"),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Min 6 characters"),
+const registerSchema = z
+  .object({
+    // Step 1: Basic Identity
+    createdFor: z.enum([
+      "Self",
+      "Daughter",
+      "Son",
+      "Sister",
+      "Brother",
+      "Relative",
+      "Friend",
+    ]),
+    gender: z.enum(["Male", "Female", "Other"]),
+    firstName: z.string().min(2, "First name must be at least 2 characters"),
+    countryCodeId: z
+      .union([z.number(), z.string()])
+      .refine((val) => val !== "", "Required"),
+    mobile: z
+      .string()
+      .regex(/^\d+$/, "Only numbers allowed")
+      .min(10, "10 digits required"),
+    email: z.string().email("Invalid email address"),
+    password: z.string().min(6, "Min 6 characters"),
+    convenientTimeToCall: z.string().optional(),
+    linkedInUrl: z.string().url("Invalid URL").optional().or(z.literal("")),
+    instagramUrl: z.string().url("Invalid URL").optional().or(z.literal("")),
+    facebookUrl: z.string().url("Invalid URL").optional().or(z.literal("")),
 
-  // Step 2: Personal Background
-  dobDay: z.string().min(1, "Day required"),
-  dobMonth: z.string().min(1, "Month required"),
-  dobYear: z.string().min(4, "Year required"),
-  heightCm: z
-    .union([z.number(), z.string()])
-    .refine((val) => val !== "", "Height is required"),
-  maritalStatus: z.enum([
-    "Never Married",
-    "Divorced",
-    "Widowed",
-    "Awaiting Divorce",
-  ]),
-  motherTongueId: z
-    .union([z.number(), z.string()])
-    .refine((val) => val !== "", "Required"),
-  religionId: z
-    .union([z.number(), z.string()])
-    .refine((val) => val !== "", "Required"),
-  casteId: z.union([z.number(), z.string()]).optional(),
-  subcaste: z.string().optional(),
-  complexion: z.string().optional(),
-  physicalStatus: z.enum(["Normal", "Physically Challenged"]),
-  shortBio: z.string().min(30, "Please write at least 30 characters"),
+    // Step 2: Personal Background
+    dobDay: z.string().min(1, "Day required"),
+    dobMonth: z.string().min(1, "Month required"),
+    dobYear: z.string().min(4, "Year required"),
+    heightCm: z
+      .union([z.number(), z.string()])
+      .refine((val) => val !== "", "Height is required"),
+    maritalStatus: z.enum([
+      "Never Married",
+      "Divorced",
+      "Widowed",
+      "Awaiting Divorce",
+    ]),
+    motherTongueId: z
+      .union([z.number(), z.string()])
+      .refine((val) => val !== "", "Required"),
+    religionId: z
+      .union([z.number(), z.string()])
+      .refine((val) => val !== "", "Required"),
+    casteId: z.union([z.number(), z.string()]).optional(),
+    subcaste: z.string().optional(),
+    complexion: z.string().optional(),
+    physicalStatus: z.enum(["Normal", "Physically Challenged"]),
+    shortBio: z.string().min(30, "Please write at least 30 characters"),
 
-  // Step 3: Family Details
-  fatherName: z.string().optional(),
-  fatherOccupation: z.string().optional(),
-  motherName: z.string().optional(),
-  motherOccupation: z.string().optional(),
-  familyType: z.enum(["Joint", "Nuclear", "Other"]).optional(),
-  familyStatus: z
-    .enum(["Middle Class", "Upper Middle Class", "Rich", "Affluent"])
-    .optional(),
-  siblingsCount: z.union([z.number(), z.string()]).optional(),
-  ownHouse: z.boolean().optional(),
-  nativeDistrict: z.string().optional(),
+    // Step 3: Family Details
+    fatherName: z.string().optional(),
+    fatherOccupation: z.string().optional(),
+    motherName: z.string().optional(),
+    motherOccupation: z.string().optional(),
+    familyType: z.enum(["Joint", "Nuclear", "Other"]).optional(),
+    familyStatus: z
+      .enum(["Middle Class", "Upper Middle Class", "Rich", "Affluent"])
+      .optional(),
+    siblingsCount: z.union([z.number(), z.string()]).optional(),
+    ownHouse: z.boolean().optional(),
+    nativeDistrict: z.string().optional(),
 
-  // Step 3A: Horoscope
-  star: z.string().optional(),
-  rasi: z.string().optional(),
-  laknam: z.string().optional(),
-  gothram: z.string().optional(),
-  sevvaiDhosham: z.enum(["Yes", "No", "Don't Know"]).optional(),
-  rahuKetuDhosham: z.enum(["Yes", "No", "Don't Know"]).optional(),
-  birthTime: z.string().optional(),
-  birthPlace: z.string().optional(),
+    // Step 3A: Horoscope
+    showHoroscope: z.boolean().default(true),
+    star: z.string().optional(),
+    rasi: z.string().optional(),
+    laknam: z.string().optional(),
+    gothram: z.string().optional(),
+    sevvaiDhosham: z.enum(["Yes", "No", "Don't Know"]).optional(),
+    rahuKetuDhosham: z.enum(["Yes", "No", "Don't Know"]).optional(),
+    birthTime: z.string().optional(),
+    birthPlace: z.string().optional(),
+    horoscopeImage: z.string().optional(),
 
-  // Step 4: Location & Lifestyle
-  country: z.string().optional(),
-  state: z.string().optional(),
-  city: z.string().optional(),
-  relocatePreference: z.enum(["Yes", "No", "Flexible"]).optional(),
-  diet: z.enum(["Veg", "Non-veg", "Eggetarian", "Vegan"]),
-  drink: z.enum(["Yes", "No", "Occasionally"]),
-  smoke: z.enum(["Yes", "No", "Occasionally"]),
-  fitnessLevel: z.enum(["Regular", "Occasional", "Not at all"]),
-  languages: z.array(z.string()).optional(),
-  hobbies: z.array(z.string()).optional(),
+    // Step 4: Location & Lifestyle
+    country: z.string().optional(),
+    state: z.string().optional(),
+    city: z.string().optional(),
+    relocatePreference: z.enum(["Yes", "No", "Flexible"]).optional(),
+    diet: z.enum(["Veg", "Non-veg", "Eggetarian", "Vegan"]),
+    drink: z.enum(["Yes", "No", "Occasionally"]),
+    smoke: z.enum(["Yes", "No", "Occasionally"]),
+    fitnessLevel: z.enum(["Regular", "Occasional", "Not at all"]),
+    languages: z.array(z.string()).optional(),
+    hobbies: z.array(z.string()).optional(),
 
-  // Step 5: Education & Career
-  highestEducation: z.string().min(2, "Education required"),
-  fieldOfStudy: z.string().optional(),
-  college: z.string().optional(),
-  employmentType: z.string().optional(),
-  companyName: z.string().optional(),
-  designation: z.string().optional(),
-  incomeRange: z.string().optional(),
-  exactIncome: z.union([z.number(), z.string()]).optional(),
-  careerPlanAfterMarriage: z.string().optional(),
+    // Step 5: Education & Career
+    highestEducation: z.string().min(2, "Education required"),
+    fieldOfStudy: z.string().optional(),
+    college: z.string().optional(),
+    employmentType: z.string().optional(),
+    companyName: z.string().optional(),
+    designation: z.string().optional(),
+    incomeRange: z.string().optional(),
+    exactIncome: z.union([z.number(), z.string()]).optional(),
+    careerPlanAfterMarriage: z.string().optional(),
 
-  // Step 6: Values & Preferences
-  ambition: z.number().min(1).max(5).optional(),
-  familyOrientation: z.number().min(1).max(5).optional(),
-  emotionalStability: z.number().min(1).max(5).optional(),
-  communicationStyle: z.number().min(1).max(5).optional(),
-  spiritualInclination: z.number().min(1).max(5).optional(),
+    // Step 6: Values & Preferences
+    ambition: z.number().min(1).max(5).optional(),
+    familyOrientation: z.number().min(1).max(5).optional(),
+    emotionalStability: z.number().min(1).max(5).optional(),
+    communicationStyle: z.number().min(1).max(5).optional(),
+    spiritualInclination: z.number().min(1).max(5).optional(),
 
-  partnerAgeMin: z.union([z.number(), z.string()]).optional(),
-  partnerAgeMax: z.union([z.number(), z.string()]).optional(),
-  partnerHeightMin: z.union([z.number(), z.string()]).optional(),
-  partnerHeightMax: z.union([z.number(), z.string()]).optional(),
-  partnerMaritalStatus: z.string().optional(),
-  preferredLocation: z.string().optional(),
-  preferredEducation: z.string().optional(),
-  preferredIncomeRange: z.string().optional(),
+    partnerAgeMin: z.union([z.number(), z.string()]).optional(),
+    partnerAgeMax: z.union([z.number(), z.string()]).optional(),
+    partnerHeightMin: z.union([z.number(), z.string()]).optional(),
+    partnerHeightMax: z.union([z.number(), z.string()]).optional(),
+    partnerMaritalStatus: z.string().optional(),
+    partnerReligion: z.string().optional(),
+    partnerCastes: z.array(z.string()).default([]),
+    preferredLocation: z.string().optional(),
+    preferredEducation: z.string().optional(),
+    preferredIncomeRange: z.string().optional(),
+    partnerLocationPreference: z.string().optional(),
 
-  // Step 7: Visibility
-  profileVisibility: z.enum(["Public", "Members Only", "Hidden"]).optional(),
-});
+    // Missing fields from form logic
+    childrenCount: z.string().optional(),
+    countryId: z.union([z.number(), z.string(), z.literal("")]).optional(),
+    stateId: z.union([z.number(), z.string(), z.literal("")]).optional(),
+    cityId: z.union([z.number(), z.string(), z.literal("")]).optional(),
+    employmentTypeId: z
+      .union([z.number(), z.string(), z.literal("")])
+      .optional(),
+    incomeCurrencyId: z
+      .union([z.number(), z.string(), z.literal("")])
+      .optional(),
+    incomeRangeId: z.union([z.number(), z.string(), z.literal("")]).optional(),
+    occupationId: z.union([z.number(), z.string(), z.literal("")]).optional(),
+
+    // Step 7: Visibility
+    profileVisibility: z.enum(["Public", "Members Only", "Hidden"]).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.showHoroscope) {
+      if (!data.rasi || data.rasi.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Rasi is required if horoscope is enabled",
+          path: ["rasi"],
+        });
+      }
+      if (!data.birthTime || data.birthTime.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Birth time is required if horoscope is enabled",
+          path: ["birthTime"],
+        });
+      }
+      if (!data.horoscopeImage) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Horoscope image is required if horoscope is enabled",
+          path: ["horoscopeImage"],
+        });
+      }
+    }
+  });
 
 type RegisterFormData = z.infer<typeof registerSchema>;
 
@@ -227,7 +277,9 @@ export default function RegisterPage() {
 
     try {
       const result = await profileService.uploadHoroscope(formData);
-      setHoroscopeImage(result.horoscope.horoscopeImageUrl);
+      const imageUrl = result.horoscope.horoscopeImageUrl;
+      setHoroscopeImage(imageUrl);
+      setValue("horoscopeImage", imageUrl, { shouldValidate: true });
     } catch (err) {
       console.error("Horoscope upload error:", err);
     } finally {
@@ -239,6 +291,7 @@ export default function RegisterPage() {
     try {
       await profileService.deleteHoroscope();
       setHoroscopeImage(null);
+      setValue("horoscopeImage", "", { shouldValidate: true });
     } catch (err) {
       console.error("Horoscope delete error:", err);
     }
@@ -261,6 +314,10 @@ export default function RegisterPage() {
       mobile: "",
       email: "",
       password: "",
+      convenientTimeToCall: "Anytime",
+      linkedInUrl: "",
+      instagramUrl: "",
+      facebookUrl: "",
       dobDay: "",
       dobMonth: "",
       dobYear: "",
@@ -284,6 +341,7 @@ export default function RegisterPage() {
       ownHouse: false,
       nativeDistrict: "",
       // Horoscope
+      showHoroscope: true,
       star: "",
       rasi: "",
       laknam: "",
@@ -292,6 +350,7 @@ export default function RegisterPage() {
       rahuKetuDhosham: "No",
       birthTime: "",
       birthPlace: "",
+      horoscopeImage: "",
       // Location & Lifestyle
       country: "India",
       state: "Tamil Nadu",
@@ -324,10 +383,21 @@ export default function RegisterPage() {
       partnerHeightMin: 150,
       partnerHeightMax: 190,
       partnerMaritalStatus: "Never Married",
+      partnerReligion: "",
+      partnerCastes: [],
       preferredLocation: "Tamil Nadu",
       preferredEducation: "",
       preferredIncomeRange: "",
+      partnerLocationPreference: "",
       profileVisibility: "Members Only",
+      childrenCount: "",
+      countryId: "",
+      stateId: "",
+      cityId: "",
+      employmentTypeId: "",
+      incomeCurrencyId: "",
+      incomeRangeId: "",
+      occupationId: "",
     },
     mode: "onTouched",
   });
@@ -342,6 +412,7 @@ export default function RegisterPage() {
   });
   const watchedCurrencyId = useWatch({ control, name: "incomeCurrencyId" });
   const watchedGender = useWatch({ control, name: "gender" });
+  const watchedShowHoroscope = useWatch({ control, name: "showHoroscope" });
 
   useEffect(() => {
     masterService
@@ -349,7 +420,7 @@ export default function RegisterPage() {
       .then((data) => {
         setCountries(data);
         const india = data.find((c) => c.phoneCode === "+91");
-        if (india) setValue("countryCodeId", india.id);
+        if (india) (setValue as any)("countryCodeId", india.id);
       })
       .catch(console.error);
 
@@ -382,13 +453,13 @@ export default function RegisterPage() {
           ]);
         })
         .catch(console.error);
-      setValue("casteId", "0");
+      (setValue as any)("casteId", "0");
     }
   }, [watchedReligionId, setValue]);
 
   useEffect(() => {
     if (watchedMaritalStatus === "Never Married") {
-      setValue("childrenCount", "");
+      (setValue as any)("childrenCount", "");
     }
   }, [watchedMaritalStatus, setValue]);
 
@@ -398,8 +469,8 @@ export default function RegisterPage() {
         .getStatesByCountry(watchedCountryId)
         .then(setStatesList)
         .catch(console.error);
-      setValue("stateId", "");
-      setValue("cityId", "");
+      (setValue as any)("stateId", "");
+      (setValue as any)("cityId", "");
     }
   }, [watchedCountryId, setValue]);
 
@@ -409,7 +480,7 @@ export default function RegisterPage() {
         .getCitiesByState(watchedStateId)
         .then(setCitiesList)
         .catch(console.error);
-      setValue("cityId", "");
+      (setValue as any)("cityId", "");
     }
   }, [watchedStateId, setValue]);
 
@@ -419,7 +490,7 @@ export default function RegisterPage() {
         .getOccupationsByEmploymentType(watchedEmploymentTypeId)
         .then(setOccupations)
         .catch(console.error);
-      setValue("occupationId", "");
+      (setValue as any)("occupationId", "");
     }
   }, [watchedEmploymentTypeId, setValue]);
 
@@ -429,12 +500,12 @@ export default function RegisterPage() {
         .getIncomeRangesByCurrency(watchedCurrencyId)
         .then(setIncomeRanges)
         .catch(console.error);
-      setValue("incomeRangeId", "");
+      (setValue as any)("incomeRangeId", "");
     }
   }, [watchedCurrencyId, setValue]);
 
   const nextStep = async (fields: any[]) => {
-    const isValid = await trigger(fields);
+    const isValid = await (trigger as any)(fields);
     if (isValid) setStep(step + 1);
     return isValid;
   };
@@ -451,7 +522,12 @@ export default function RegisterPage() {
   };
 
   const handleStep1Register = async () => {
-    const isValid = await trigger(["firstName", "email", "password", "mobile"]);
+    const isValid = await (trigger as any)([
+      "firstName",
+      "email",
+      "password",
+      "mobile",
+    ]);
     if (!isValid) return;
 
     // Detect existing session to avoid "User Already Exists" error on back-navigation
@@ -862,6 +938,59 @@ export default function RegisterPage() {
                       />
                     </div>
                   </div>
+                  <div className="col-span-full">
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      Convenient Time to Call
+                    </label>
+                    <Controller
+                      control={control}
+                      name="convenientTimeToCall"
+                      render={({ field }) => (
+                        <PremiumSelect
+                          options={[
+                            "Anytime",
+                            "Morning (9 AM - 12 PM)",
+                            "Afternoon (12 PM - 4 PM)",
+                            "Evening (4 PM - 9 PM)",
+                          ].map((opt) => ({ id: opt, name: opt }))}
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                        />
+                      )}
+                    />
+                  </div>
+                  <div className="col-span-full grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        LinkedIn (Optional)
+                      </label>
+                      <input
+                        {...register("linkedInUrl")}
+                        placeholder="https://linkedin.com/in/..."
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none placeholder:text-slate-600 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Instagram (Optional)
+                      </label>
+                      <input
+                        {...register("instagramUrl")}
+                        placeholder="https://instagram.com/..."
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none placeholder:text-slate-600 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Facebook (Optional)
+                      </label>
+                      <input
+                        {...register("facebookUrl")}
+                        placeholder="https://facebook.com/..."
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none placeholder:text-slate-600 transition-all"
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div className="flex justify-end pt-6">
                   <button
@@ -1172,99 +1301,278 @@ export default function RegisterPage() {
                       className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      Father's Occupation
+                    </label>
+                    <input
+                      type="text"
+                      {...register("fatherOccupation")}
+                      placeholder="e.g. Business, Retired"
+                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      Mother's Occupation
+                    </label>
+                    <input
+                      type="text"
+                      {...register("motherOccupation")}
+                      placeholder="e.g. Homemaker, Teacher"
+                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      Siblings Count
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      {...register("siblingsCount")}
+                      placeholder="Number of brothers/sisters"
+                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-300 mb-2">
+                      Own House
+                    </label>
+                    <Controller
+                      control={control}
+                      name="ownHouse"
+                      render={({ field }) => (
+                        <div className="flex gap-4 mt-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <div
+                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${field.value === true ? "border-purple-500 bg-purple-500/20" : "border-slate-600"}`}
+                              onClick={() => field.onChange(true)}
+                            >
+                              {field.value === true && (
+                                <div className="w-3 h-3 rounded-full bg-purple-500" />
+                              )}
+                            </div>
+                            <span className="text-slate-300 font-medium">
+                              Yes
+                            </span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <div
+                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${field.value === false ? "border-purple-500 bg-purple-500/20" : "border-slate-600"}`}
+                              onClick={() => field.onChange(false)}
+                            >
+                              {field.value === false && (
+                                <div className="w-3 h-3 rounded-full bg-purple-500" />
+                              )}
+                            </div>
+                            <span className="text-slate-300 font-medium">
+                              No
+                            </span>
+                          </label>
+                        </div>
+                      )}
+                    />
+                  </div>
                 </div>
 
-                <div className="pt-6 pb-4 border-b border-purple-500/20">
+                <div className="pt-6 pb-4 border-b border-purple-500/20 flex items-center justify-between">
                   <h3 className="text-lg font-bold text-white flex items-center gap-2">
                     <StarIcon className="w-5 h-5 text-amber-400" />
                     Horoscope Details
                   </h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Star (Nakshatram)
-                    </label>
-                    <input
-                      type="text"
-                      {...register("star")}
-                      placeholder="Select or type..."
-                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Rasi
-                    </label>
-                    <input
-                      type="text"
-                      {...register("rasi")}
-                      placeholder="Select or type..."
-                      className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-300 mb-2">
-                      Sevvai/Rahu Dosham
-                    </label>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-slate-300">
+                      Enable Horoscope
+                    </span>
                     <Controller
                       control={control}
-                      name="sevvaiDhosham"
+                      name="showHoroscope"
                       render={({ field }) => (
-                        <PremiumSelect
-                          options={["No", "Yes", "Don't Know"].map((opt) => ({
-                            id: opt,
-                            name: opt,
-                          }))}
-                          value={field.value ?? ""}
-                          onChange={field.onChange}
-                        />
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={field.value}
+                          onClick={() => field.onChange(!field.value)}
+                          className={`${
+                            field.value ? "bg-amber-400" : "bg-slate-700"
+                          } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-slate-900`}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`${
+                              field.value ? "translate-x-5" : "translate-x-0"
+                            } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                          />
+                        </button>
                       )}
                     />
                   </div>
-                  <div className="col-span-full">
-                    <label className="block text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                      <DocumentArrowUpIcon className="w-5 h-5 text-amber-400" />
-                      Horoscope Image
-                    </label>
-                    {horoscopeImage ? (
-                      <div className="relative w-48 h-64 rounded-2xl overflow-hidden border border-amber-500/20 group">
-                        <img
-                          src={horoscopeImage}
-                          alt="Horoscope"
-                          className="w-full h-full object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleHoroscopeDelete}
-                          className="absolute top-2 right-2 p-2 bg-rose-500 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <XMarkIcon className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="w-full h-32 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer hover:border-amber-500/50 transition-all bg-slate-900/50">
-                        <input
-                          type="file"
-                          className="hidden"
-                          onChange={handleHoroscopeUpload}
-                          accept="image/*"
-                          disabled={uploading}
-                        />
-                        {uploading ? (
-                          <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-                        ) : (
-                          <>
-                            <DocumentArrowUpIcon className="w-10 h-10 text-slate-600 mb-2" />
-                            <span className="text-sm font-bold text-slate-500">
-                              Upload Horoscope (JPG/PNG)
-                            </span>
-                          </>
-                        )}
-                      </label>
-                    )}
-                  </div>
                 </div>
+                {watchedShowHoroscope && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Star (Nakshatram)
+                      </label>
+                      <input
+                        type="text"
+                        {...register("star")}
+                        placeholder="Select or type..."
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Rasi <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        {...register("rasi")}
+                        placeholder="Select or type..."
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                      />
+                      {errors.rasi && (
+                        <p className="text-rose-500 text-xs mt-1">
+                          {errors.rasi.message}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Laknam
+                      </label>
+                      <input
+                        type="text"
+                        {...register("laknam")}
+                        placeholder="e.g. Mesha"
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Gothram
+                      </label>
+                      <input
+                        type="text"
+                        {...register("gothram")}
+                        placeholder="e.g. Shiva"
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Birth Time <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        {...register("birthTime")}
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                      />
+                      {errors.birthTime && (
+                        <p className="text-rose-500 text-xs mt-1">
+                          {errors.birthTime.message}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Birth Place
+                      </label>
+                      <input
+                        type="text"
+                        {...register("birthPlace")}
+                        placeholder="e.g. Chennai"
+                        className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Sevvai Dosham
+                      </label>
+                      <Controller
+                        control={control}
+                        name="sevvaiDhosham"
+                        render={({ field }) => (
+                          <PremiumSelect
+                            options={["No", "Yes", "Don't Know"].map((opt) => ({
+                              id: opt,
+                              name: opt,
+                            }))}
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                        )}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Rahu Ketu Dosham
+                      </label>
+                      <Controller
+                        control={control}
+                        name="rahuKetuDhosham"
+                        render={({ field }) => (
+                          <PremiumSelect
+                            options={["No", "Yes", "Don't Know"].map((opt) => ({
+                              id: opt,
+                              name: opt,
+                            }))}
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                        )}
+                      />
+                    </div>
+                    <div className="col-span-full">
+                      <label className="block text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                        <DocumentArrowUpIcon className="w-5 h-5 text-amber-400" />
+                        Horoscope Image <span className="text-rose-500">*</span>
+                      </label>
+                      {horoscopeImage ? (
+                        <div className="relative w-48 h-64 rounded-2xl overflow-hidden border border-amber-500/20 group">
+                          <img
+                            src={horoscopeImage}
+                            alt="Horoscope"
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleHoroscopeDelete}
+                            className="absolute top-2 right-2 p-2 bg-rose-500 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <XMarkIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="w-full h-32 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer hover:border-amber-500/50 transition-all bg-slate-900/50">
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={handleHoroscopeUpload}
+                            accept="image/*"
+                            disabled={uploading}
+                          />
+                          {uploading ? (
+                            <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <>
+                              <DocumentArrowUpIcon className="w-10 h-10 text-slate-600 mb-2" />
+                              <span className="text-sm font-bold text-slate-500">
+                                Upload Horoscope (JPG/PNG)
+                              </span>
+                            </>
+                          )}
+                        </label>
+                      )}
+                      {errors.horoscopeImage && (
+                        <p className="text-rose-500 text-xs mt-1">
+                          {errors.horoscopeImage.message}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex justify-between pt-6">
                   <button
@@ -1281,11 +1589,24 @@ export default function RegisterPage() {
                       nextStep([
                         "fatherName",
                         "motherName",
+                        "fatherOccupation",
+                        "motherOccupation",
                         "nativeDistrict",
+                        "familyType",
                         "casteId",
+                        "subcaste",
+                        "siblingsCount",
+                        "ownHouse",
+                        "showHoroscope",
                         "star",
                         "rasi",
+                        "laknam",
+                        "gothram",
+                        "birthTime",
+                        "birthPlace",
                         "sevvaiDhosham",
+                        "rahuKetuDhosham",
+                        "horoscopeImage",
                       ])
                     }
                     className="group px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black shadow-[0_10px_20px_rgba(168,85,247,0.3)] hover:scale-[1.05] active:scale-95 transition-all flex items-center space-x-2"
@@ -1618,6 +1939,64 @@ export default function RegisterPage() {
                         {...register("partnerAgeMax")}
                         className="w-full bg-slate-900/50 border border-white/10 text-white rounded-2xl py-4 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none"
                         placeholder="35"
+                      />
+                    </div>
+                    <div className="col-span-full">
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Preferred Religion
+                      </label>
+                      <Controller
+                        control={control}
+                        name="partnerReligion"
+                        render={({ field }) => (
+                          <PremiumSelect
+                            options={religions.map((r) => ({
+                              id: String(r.id),
+                              name: r.name,
+                            }))}
+                            value={String(field.value)}
+                            onChange={(val) => {
+                              field.onChange(val);
+                              setValue("partnerCastes", []);
+                            }}
+                            placeholder="Any Religion"
+                          />
+                        )}
+                      />
+                    </div>
+                    <div className="col-span-full">
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Preferred Caste(s)
+                      </label>
+                      <Controller
+                        control={control}
+                        name="partnerCastes"
+                        render={({ field }) => (
+                          <MultiSearchableDropdown
+                            options={
+                              field.value
+                                ? [{ id: "any", name: "Any Caste" }, ...castes]
+                                : castes
+                            }
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="Any Caste"
+                            disabled={
+                              !useWatch({ control, name: "partnerReligion" })
+                            }
+                          />
+                        )}
+                      />
+                    </div>
+                    <div className="col-span-full">
+                      <label className="block text-sm font-bold text-slate-300 mb-2">
+                        Specific Location Preference
+                      </label>
+                      <textarea
+                        {...register("partnerLocationPreference")}
+                        rows={2}
+                        placeholder="Preferred cities or areas..."
+                        className="w-full bg-slate-900/50 border border-white/10 rounded-2xl p-4 text-white outline-none focus:ring-2 focus:ring-purple-500/50"
                       />
                     </div>
                   </div>

@@ -8,6 +8,8 @@ import {
   deleteHoroscope,
   saveDraft,
   getDraft,
+  getOtherProfile,
+  updatePrivacySettings,
 } from "../controllers/profileController";
 import { protect } from "../middlewares/authMiddleware";
 import { upload } from "../middlewares/uploadMiddleware";
@@ -22,5 +24,8 @@ router.post("/photos", protect, upload.single("photo"), uploadPhotos);
 router.delete("/photos/:photoId", protect, deletePhoto);
 router.post("/horoscope", protect, upload.single("horoscope"), uploadHoroscope);
 router.delete("/horoscope", protect, deleteHoroscope);
+
+router.get("/user/:id", protect, getOtherProfile);
+router.patch("/privacy", protect, updatePrivacySettings);
 
 export default router;

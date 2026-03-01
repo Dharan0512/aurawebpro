@@ -22,11 +22,7 @@ export const profileService = {
   },
 
   uploadPhotos: async (formData: FormData) => {
-    const response = await apiClient.post("/profile/photos", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    const response = await apiClient.post("/profile/photos", formData);
     return response.data;
   },
 
@@ -36,16 +32,25 @@ export const profileService = {
   },
 
   uploadHoroscope: async (formData: FormData) => {
-    const response = await apiClient.post("/profile/horoscope", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    const response = await apiClient.post("/profile/horoscope", formData);
     return response.data;
   },
 
   deleteHoroscope: async () => {
     const response = await apiClient.delete("/profile/horoscope");
+    return response.data;
+  },
+
+  getOtherProfile: async (userId: string | number) => {
+    const response = await apiClient.get(`/profile/user/${userId}`);
+    return response.data;
+  },
+
+  updatePrivacySettings: async (settings: {
+    privacySettings?: any;
+    profileVisibility?: string;
+  }) => {
+    const response = await apiClient.patch("/profile/privacy", settings);
     return response.data;
   },
 };

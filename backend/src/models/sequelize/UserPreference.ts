@@ -26,6 +26,7 @@ interface UserPreferenceAttributes {
   preferredIncomeRange: string | null;
   mustHave: any | null; // JSONB
   dealBreakers: any | null; // JSONB
+  partnerCastes: string[] | null; // JSONB for multi-select
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -71,6 +72,7 @@ export class UserPreference
   public preferredIncomeRange!: string | null;
   public mustHave!: any | null;
   public dealBreakers!: any | null;
+  public partnerCastes!: string[] | null;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -130,6 +132,7 @@ UserPreference.init(
     preferredIncomeRange: { type: DataTypes.STRING(100), allowNull: true },
     mustHave: { type: DataTypes.JSONB, allowNull: true },
     dealBreakers: { type: DataTypes.JSONB, allowNull: true },
+    partnerCastes: { type: DataTypes.JSONB, allowNull: true },
   },
   {
     sequelize,

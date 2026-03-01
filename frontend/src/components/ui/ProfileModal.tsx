@@ -13,9 +13,18 @@ import {
   LogOut,
   Edit2,
   Trash2,
+  Linkedin,
+  Instagram,
+  Facebook,
+  Sparkles,
+  Settings,
+  Lock,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import "./ProfileModal.css";
 import EditProfileForm from "../../features/profile/EditProfileForm";
+import { authService } from "@/services/authService";
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -33,6 +42,19 @@ export default function ProfileModal({
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState("about");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [passwordStatus, setPasswordStatus] = useState({
+    error: "",
+    success: "",
+    loading: false,
+  });
+  const [privacySaving, setPrivacySaving] = useState(false);
+
   const BACKEND_URL =
     process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
@@ -98,6 +120,85 @@ export default function ProfileModal({
     }
   };
 
+  const handlePrivacyChange = async (key: string, value: boolean) => {
+    try {
+      setPrivacySaving(true);
+      const currentSettings = profile.profile?.privacySettings || {};
+      const newSettings = { ...currentSettings, [key]: value };
+      await profileService.updatePrivacySettings({
+        privacySettings: newSettings,
+      });
+      setProfile({
+        ...profile,
+        profile: { ...profile.profile, privacySettings: newSettings },
+      });
+    } catch (e) {
+      console.error(e);
+      alert("Failed to update privacy settings.");
+    } finally {
+      setPrivacySaving(false);
+    }
+  };
+
+  const handleStatusChange = async (status: string) => {
+    try {
+      setPrivacySaving(true);
+      await profileService.updatePrivacySettings({ profileVisibility: status });
+      setProfile({
+        ...profile,
+        profile: { ...profile.profile, profileVisibility: status },
+      });
+    } catch (e) {
+      console.error(e);
+      alert("Failed to update profile status.");
+    } finally {
+      setPrivacySaving(false);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordStatus({ error: "", success: "", loading: true });
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordStatus({
+        error: "New passwords do not match",
+        success: "",
+        loading: false,
+      });
+      return;
+    }
+    if (passwordData.newPassword.length < 6) {
+      setPasswordStatus({
+        error: "Password must be at least 6 characters",
+        success: "",
+        loading: false,
+      });
+      return;
+    }
+    try {
+      await authService.changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      });
+      setPasswordStatus({
+        error: "",
+        success: "Password changed successfully!",
+        loading: false,
+      });
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+    } catch (error: any) {
+      setPasswordStatus({
+        error: error.response?.data?.message || "Failed to change password",
+        success: "",
+        loading: false,
+      });
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -149,11 +250,41 @@ export default function ProfileModal({
                     yrs
                   </span>
                   <span className="badge">
-                    {profile.profile?.City?.name || "Global"}
-                  </span>
-                  <span className="badge">
                     {profile.profile?.Religion?.name}
                   </span>
+                </div>
+                {/* Social Links */}
+                <div className="flex gap-4 mt-4">
+                  {profile.profile?.linkedInUrl && (
+                    <a
+                      href={profile.profile.linkedInUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white hover:text-[#D4AF37] transition-colors"
+                    >
+                      <Linkedin size={20} />
+                    </a>
+                  )}
+                  {profile.profile?.instagramUrl && (
+                    <a
+                      href={profile.profile.instagramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white hover:text-[#D4AF37] transition-colors"
+                    >
+                      <Instagram size={20} />
+                    </a>
+                  )}
+                  {profile.profile?.facebookUrl && (
+                    <a
+                      href={profile.profile.facebookUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white hover:text-[#D4AF37] transition-colors"
+                    >
+                      <Facebook size={20} />
+                    </a>
+                  )}
                 </div>
               </div>
               <button
@@ -172,147 +303,692 @@ export default function ProfileModal({
               />
             </div>
 
-            {/* Content Tabs */}
-            <div className="profile-content">
-              {/* Photo Gallery */}
-              <div className="section-title">
-                <Camera size={20} /> Photo Gallery
-              </div>
-              <div className="photo-gallery">
-                {profile.photos && profile.photos.length > 0 ? (
-                  profile.photos.map((photo: any, idx: number) => (
-                    <div key={idx} className="gallery-item">
-                      <img
-                        src={getPhotoUrl(photo.url)}
-                        alt={`Gallery ${idx}`}
-                      />
-                      <button
-                        className="delete-photo-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (photo.id) handleDeletePhoto(photo.id);
-                        }}
-                        title="Delete photo"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+            {/* Content Tabs Navigation */}
+            <div className="flex px-8 border-b border-white/10 gap-8 mt-2 overflow-x-auto custom-scrollbar">
+              {["about", "background", "astrology", "partner", "manage"].map(
+                (tab) => (
+                  <button
+                    key={tab}
+                    className={`py-4 text-sm font-bold tracking-wider uppercase transition-colors whitespace-nowrap border-b-2 ${
+                      activeTab === tab
+                        ? "text-[#D4AF37] border-[#D4AF37]"
+                        : "text-slate-400 border-transparent hover:text-white"
+                    }`}
+                    onClick={() => setActiveTab(tab)}
+                  >
+                    {tab === "manage" ? (
+                      <span className="flex items-center gap-2">
+                        <Settings size={16} /> Manage
+                      </span>
+                    ) : (
+                      tab
+                    )}
+                  </button>
+                ),
+              )}
+            </div>
+
+            {/* Content Area */}
+            <div className="profile-content pt-6">
+              {activeTab === "about" && (
+                <div className="space-y-8 animate-in fade-in duration-300">
+                  {/* Photo Gallery */}
+                  <div>
+                    <div className="section-title">
+                      <Camera size={20} /> Photo Gallery
                     </div>
-                  ))
-                ) : (
-                  <div className="text-slate-500 italic text-sm py-4">
-                    No gallery photos yet. Add some to stand out!
+                    <div className="photo-gallery">
+                      {profile.photos && profile.photos.length > 0 ? (
+                        profile.photos.map((photo: any, idx: number) => (
+                          <div key={idx} className="gallery-item">
+                            <img
+                              src={getPhotoUrl(photo.url)}
+                              alt={`Gallery ${idx}`}
+                            />
+                            <button
+                              className="delete-photo-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (photo.id) handleDeletePhoto(photo.id);
+                              }}
+                              title="Delete photo"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-slate-500 italic text-sm py-4">
+                          No gallery photos yet. Add some to stand out!
+                        </div>
+                      )}
+                      <div
+                        className="add-photo-btn"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Camera size={24} />
+                        <span className="text-xs">Add photo</span>
+                      </div>
+                    </div>
                   </div>
-                )}
-                <div
-                  className="add-photo-btn"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Camera size={24} />
-                  <span className="text-xs">Add photo</span>
-                </div>
-              </div>
 
-              {/* Basic Details */}
-              <div className="section-title">
-                <User size={20} /> Personal Information
-              </div>
-              <div className="details-grid">
-                <div className="detail-item">
-                  <span className="detail-label">Full Name</span>
-                  <span className="detail-value">
-                    {profile.user?.firstName} {profile.user?.lastName}
-                  </span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Gender</span>
-                  <span className="detail-value">{profile.user?.gender}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Date of Birth</span>
-                  <span className="detail-value">{profile.profile?.dob}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Mother Tongue</span>
-                  <span className="detail-value">
-                    {profile.profile?.MotherTongue?.name || "English"}
-                  </span>
-                </div>
-              </div>
+                  {/* Bio */}
+                  {profile.profile?.shortBio && (
+                    <div>
+                      <div className="section-title">
+                        <User size={20} /> About Me
+                      </div>
+                      <div className="p-4 bg-slate-900/40 rounded-2xl border border-white/5 text-slate-300 italic text-sm leading-relaxed">
+                        "{profile.profile.shortBio}"
+                      </div>
+                    </div>
+                  )}
 
-              {/* Professional Section */}
-              <div className="section-title">
-                <Briefcase size={20} /> Education & Career
-              </div>
-              <div className="details-grid">
-                <div className="detail-item">
-                  <span className="detail-label">Highest Education</span>
-                  <span className="detail-value">
-                    {profile.profile?.Education?.name}
-                  </span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Profession</span>
-                  <span className="detail-value">
-                    {profile.profile?.Occupation?.name || "Not specified"}
-                  </span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Annual Income</span>
-                  <span className="detail-value">
-                    {profile.profile?.IncomeRange?.displayLabel ||
-                      "Confidential"}
-                  </span>
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Basic Details */}
+                    <div>
+                      <div className="section-title">
+                        <User size={20} /> Personal Info
+                      </div>
+                      <div className="details-grid grid-cols-1 gap-y-3">
+                        <div className="detail-item justify-between border-b border-white/5 pb-2">
+                          <span className="detail-label">Full Name</span>
+                          <span className="detail-value">
+                            {profile.user?.firstName} {profile.user?.lastName}
+                          </span>
+                        </div>
+                        <div className="detail-item justify-between border-b border-white/5 pb-2">
+                          <span className="detail-label">Date of Birth</span>
+                          <span className="detail-value">
+                            {profile.profile?.dob}
+                          </span>
+                        </div>
+                        <div className="detail-item justify-between border-b border-white/5 pb-2">
+                          <span className="detail-label">Height</span>
+                          <span className="detail-value">
+                            {profile.profile?.heightCm} cm
+                          </span>
+                        </div>
+                        <div className="detail-item justify-between">
+                          <span className="detail-label">Marital Status</span>
+                          <span className="detail-value">
+                            {profile.profile?.maritalStatus}
+                          </span>
+                        </div>
+                        {profile.profile?.maritalStatus !== "Never Married" && (
+                          <>
+                            <div className="detail-item justify-between border-t border-white/5 pt-2">
+                              <span className="detail-label">Children</span>
+                              <span className="detail-value">
+                                {profile.profile?.childrenCount || 0}
+                              </span>
+                            </div>
+                            <div className="detail-item justify-between">
+                              <span className="detail-label">Living With</span>
+                              <span className="detail-value">
+                                {profile.profile?.childrenLivingWith
+                                  ? "Yes"
+                                  : "No"}
+                              </span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
 
-              {/* Religion Section */}
-              <div className="section-title">
-                <Heart size={20} /> Religion & Ethnicity
-              </div>
-              <div className="details-grid">
-                <div className="detail-item">
-                  <span className="detail-label">Religion</span>
-                  <span className="detail-value">
-                    {profile.profile?.Religion?.name}
-                  </span>
+                    {/* Location & Lifestyle */}
+                    <div>
+                      <div className="section-title">
+                        <MapPin size={20} /> Lifestyle & Location
+                      </div>
+                      <div className="details-grid grid-cols-1 gap-y-3">
+                        <div className="detail-item justify-between border-b border-white/5 pb-2">
+                          <span className="detail-label">Current City</span>
+                          <span className="detail-value">
+                            {profile.profile?.LocationLifestyle?.city ||
+                              "Not specified"}
+                          </span>
+                        </div>
+                        <div className="detail-item justify-between border-b border-white/5 pb-2">
+                          <span className="detail-label">Diet</span>
+                          <span className="detail-value">
+                            {profile.profile?.LocationLifestyle?.diet ||
+                              "Not specified"}
+                          </span>
+                        </div>
+                        <div className="detail-item justify-between border-b border-white/5 pb-2">
+                          <span className="detail-label">Smoking</span>
+                          <span className="detail-value">
+                            {profile.profile?.LocationLifestyle?.smoke || "No"}
+                          </span>
+                        </div>
+                        <div className="detail-item justify-between">
+                          <span className="detail-label">Drinking</span>
+                          <span className="detail-value">
+                            {profile.profile?.LocationLifestyle?.drink || "No"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="detail-item">
-                  <span className="detail-label">Caste / Sub-caste</span>
-                  <span className="detail-value">
-                    {profile.profile?.Caste?.name || "Open"} /{" "}
-                    {profile.profile?.subcaste || "Open"}
-                  </span>
-                </div>
-              </div>
+              )}
 
-              {/* Preferences Section */}
-              <div className="section-title">
-                <Heart size={20} className="text-[#D4AF37] fill-[#D4AF37]/20" />{" "}
-                Partner Preferences
-              </div>
-              <div className="details-grid">
-                <div className="detail-item">
-                  <span className="detail-label">Age Range</span>
-                  <span className="detail-value">
-                    {profile.preferences?.minAge} -{" "}
-                    {profile.preferences?.maxAge} years
-                  </span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Religion Preference</span>
-                  <span className="detail-value">
-                    {profile.preferences?.Religion?.name || "Any"}
-                  </span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Preferred Location</span>
-                  <span className="detail-value">
-                    {profile.preferences?.City?.name || "Open to any"}
-                  </span>
-                </div>
-              </div>
+              {activeTab === "background" && (
+                <div className="space-y-8 animate-in fade-in duration-300">
+                  {/* Religion Section */}
+                  <div>
+                    <div className="section-title">
+                      <Heart size={20} /> Religion & Ethnicity
+                    </div>
+                    <div className="details-grid">
+                      <div className="detail-item">
+                        <span className="detail-label">Religion</span>
+                        <span className="detail-value">
+                          {profile.profile?.Religion?.name || "Not specified"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Caste / Sub-caste</span>
+                        <span className="detail-value">
+                          {profile.profile?.Caste?.name || "Open"} /{" "}
+                          {profile.profile?.subcaste || "Open"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Mother Tongue</span>
+                        <span className="detail-value">
+                          {profile.profile?.MotherTongue?.name || "English"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="mt-8 flex justify-center">
+                  {/* Professional Section */}
+                  <div>
+                    <div className="section-title">
+                      <Briefcase size={20} /> Education & Career
+                    </div>
+                    <div className="details-grid">
+                      <div className="detail-item">
+                        <span className="detail-label">Highest Education</span>
+                        <span className="detail-value">
+                          {profile.profile?.EducationCareer?.highestEducation ||
+                            profile.profile?.Education?.name ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">
+                          College / Institution
+                        </span>
+                        <span className="detail-value">
+                          {profile.profile?.EducationCareer?.college ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Profession</span>
+                        <span className="detail-value">
+                          {profile.profile?.EducationCareer?.designation ||
+                            profile.profile?.Occupation?.name ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Company</span>
+                        <span className="detail-value">
+                          {profile.profile?.EducationCareer?.companyName ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Employment Type</span>
+                        <span className="detail-value">
+                          {profile.profile?.EducationCareer?.employmentType ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Annual Income</span>
+                        <span className="detail-value">
+                          {profile.profile?.EducationCareer?.incomeRange ||
+                            profile.profile?.IncomeRange?.displayLabel ||
+                            "Confidential"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Family Roots Section */}
+                  <div>
+                    <div className="section-title">
+                      <Home size={20} /> Family Roots
+                    </div>
+                    <div className="details-grid">
+                      <div className="detail-item">
+                        <span className="detail-label">Father's Name</span>
+                        <span className="detail-value">
+                          {profile.profile?.FamilyDetail?.fatherName ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">
+                          Father's Occupation
+                        </span>
+                        <span className="detail-value">
+                          {profile.profile?.FamilyDetail?.fatherOccupation ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Mother's Name</span>
+                        <span className="detail-value">
+                          {profile.profile?.FamilyDetail?.motherName ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">
+                          Mother's Occupation
+                        </span>
+                        <span className="detail-value">
+                          {profile.profile?.FamilyDetail?.motherOccupation ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Family Type</span>
+                        <span className="detail-value">
+                          {profile.profile?.FamilyDetail?.familyType ||
+                            "Nuclear"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Family Status</span>
+                        <span className="detail-value">
+                          {profile.profile?.familyStatus || "Middle Class"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Siblings</span>
+                        <span className="detail-value">
+                          {profile.profile?.FamilyDetail?.siblingsCount || 0}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Own House</span>
+                        <span className="detail-value">
+                          {profile.profile?.FamilyDetail?.ownHouse
+                            ? "Yes"
+                            : "No"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Native District</span>
+                        <span className="detail-value">
+                          {profile.profile?.FamilyDetail?.nativeDistrict ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "astrology" && (
+                <div className="space-y-8 animate-in fade-in duration-300">
+                  {/* Horoscope Section */}
+                  <div>
+                    <div className="section-title">
+                      <Sparkles size={20} className="text-amber-400" />{" "}
+                      Horoscope & Astrology
+                    </div>
+                    <div className="details-grid">
+                      <div className="detail-item">
+                        <span className="detail-label">Star (Nakshatram)</span>
+                        <span className="detail-value">
+                          {profile.profile?.HoroscopeDetail?.star ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Rasi</span>
+                        <span className="detail-value">
+                          {profile.profile?.HoroscopeDetail?.rasi ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Laknam</span>
+                        <span className="detail-value">
+                          {profile.profile?.HoroscopeDetail?.laknam ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Gothram</span>
+                        <span className="detail-value">
+                          {profile.profile?.HoroscopeDetail?.gothram ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Sevvai Dosham</span>
+                        <span className="detail-value text-amber-500 font-bold">
+                          {profile.profile?.HoroscopeDetail?.sevvaiDhosham ||
+                            "No"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Rahu Ketu Dosham</span>
+                        <span className="detail-value text-amber-500 font-bold">
+                          {profile.profile?.HoroscopeDetail?.rahuKetuDhosham ||
+                            "No"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Birth Time</span>
+                        <span className="detail-value">
+                          {profile.profile?.HoroscopeDetail?.birthTime ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Birth Place</span>
+                        <span className="detail-value">
+                          {profile.profile?.HoroscopeDetail?.birthPlace ||
+                            "Not specified"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {profile.profile?.HoroscopeDetail?.horoscopeImageUrl && (
+                      <div className="mt-6 p-4 bg-slate-900/40 rounded-3xl border border-white/5">
+                        <span className="detail-label block mb-4 flex items-center gap-2">
+                          <Sparkles size={16} className="text-amber-400" />{" "}
+                          Horoscope Chart
+                        </span>
+                        <img
+                          src={getPhotoUrl(
+                            profile.profile.HoroscopeDetail.horoscopeImageUrl,
+                          )}
+                          alt="Horoscope Chart"
+                          className="w-full max-w-sm mx-auto rounded-2xl shadow-2xl border border-white/10"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "partner" && (
+                <div className="space-y-8 animate-in fade-in duration-300">
+                  {/* Preferences Section */}
+                  <div>
+                    <div className="section-title">
+                      <Heart size={20} className="text-[#D4AF37]" /> Partner
+                      Preferences
+                    </div>
+                    <div className="details-grid">
+                      <div className="detail-item">
+                        <span className="detail-label">Age Range</span>
+                        <span className="detail-value">
+                          {profile.preferences?.minAge} -{" "}
+                          {profile.preferences?.maxAge} years
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Height Range</span>
+                        <span className="detail-value">
+                          {profile.preferences?.minHeightCm}cm -{" "}
+                          {profile.preferences?.maxHeightCm}cm
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Marital Status</span>
+                        <span className="detail-value">
+                          {profile.preferences?.maritalStatus || "Any"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">
+                          Religion Preference
+                        </span>
+                        <span className="detail-value">
+                          {profile.preferences?.Religion?.name || "Any"}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Preferred Location</span>
+                        <span className="detail-value">
+                          {profile.preferences?.partnerLocationPreference ||
+                            profile.preferences?.City?.name ||
+                            "Open to any"}
+                        </span>
+                      </div>
+                      {profile.preferences?.partnerCastes &&
+                        Array.isArray(profile.preferences.partnerCastes) &&
+                        profile.preferences.partnerCastes.length > 0 && (
+                          <div className="detail-item col-span-full">
+                            <span className="detail-label">
+                              Preferred Caste(s)
+                            </span>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {profile.preferences.partnerCastes.map(
+                                (caste: string) => (
+                                  <span
+                                    key={caste}
+                                    className="px-3 py-1 bg-purple-500/10 border border-purple-500/30 text-purple-300 rounded-full text-xs"
+                                  >
+                                    {caste === "any" ? "Any Caste" : caste}
+                                  </span>
+                                ),
+                              )}
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "manage" && (
+                <div className="space-y-8 animate-in fade-in duration-300">
+                  {/* Privacy & Visibility */}
+                  <div>
+                    <div className="section-title">
+                      <Eye size={20} className="text-[#D4AF37]" /> Profile
+                      Visibility & Privacy
+                    </div>
+
+                    <div className="p-6 bg-slate-900/40 rounded-2xl border border-white/5 space-y-6">
+                      <div className="flex items-center justify-between pb-6 border-b border-white/10">
+                        <div>
+                          <h4 className="text-white font-medium">
+                            Profile Status
+                          </h4>
+                          <p className="text-sm text-slate-400">
+                            Control who can see your profile
+                          </p>
+                        </div>
+                        <select
+                          className="bg-slate-800 border border-white/10 rounded-lg px-4 py-2 text-white outline-none focus:border-[#D4AF37] transition-colors"
+                          value={profile.profile?.profileVisibility || "Public"}
+                          onChange={(e) => handleStatusChange(e.target.value)}
+                          disabled={privacySaving}
+                        >
+                          <option value="Public">Public (Everyone)</option>
+                          <option value="Members Only">Members Only</option>
+                          <option value="Hidden">Hidden (Invisible)</option>
+                        </select>
+                      </div>
+
+                      {[
+                        {
+                          key: "showHoroscope",
+                          label: "Show Horoscope",
+                          desc: "Display your astrology chart and details",
+                        },
+                        {
+                          key: "showAstroMatch",
+                          label: "Show Astro Match",
+                          desc: "Allow others to see horoscope compatibility",
+                        },
+                        {
+                          key: "showExactIncome",
+                          label: "Show Exact Income",
+                          desc: "Display your precise salary digits",
+                        },
+                        {
+                          key: "showFamilyDetails",
+                          label: "Show Family Details",
+                          desc: "Display parents occupations and siblings",
+                        },
+                        {
+                          key: "showBirthDetails",
+                          label: "Show Birth Details",
+                          desc: "Display exact birth time and place",
+                        },
+                        {
+                          key: "showSocialLinks",
+                          label: "Show Social Links",
+                          desc: "Display your Instagram/LinkedIn/Facebook",
+                        },
+                        {
+                          key: "showValues",
+                          label: "Show Values Ratings",
+                          desc: "Display your ambition and personality scales",
+                        },
+                      ].map((setting) => {
+                        // Default to true for most, false for exact income (matching backend default)
+                        const isChecked =
+                          profile.profile?.privacySettings?.[setting.key] ??
+                          setting.key !== "showExactIncome";
+                        return (
+                          <div
+                            key={setting.key}
+                            className="flex items-center justify-between"
+                          >
+                            <div>
+                              <h4 className="text-white text-sm font-medium">
+                                {setting.label}
+                              </h4>
+                              <p className="text-xs text-slate-400">
+                                {setting.desc}
+                              </p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                className="sr-only peer"
+                                checked={isChecked}
+                                onChange={(e) =>
+                                  handlePrivacyChange(
+                                    setting.key,
+                                    e.target.checked,
+                                  )
+                                }
+                                disabled={privacySaving}
+                              />
+                              <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#D4AF37]"></div>
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Change Password */}
+                  <div>
+                    <div className="section-title">
+                      <Lock size={20} className="text-slate-300" /> Change
+                      Password
+                    </div>
+
+                    <form
+                      onSubmit={handlePasswordChange}
+                      className="p-6 bg-slate-900/40 rounded-2xl border border-white/5 space-y-4 max-w-lg"
+                    >
+                      {passwordStatus.error && (
+                        <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-sm">
+                          {passwordStatus.error}
+                        </div>
+                      )}
+                      {passwordStatus.success && (
+                        <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-400 rounded-lg text-sm">
+                          {passwordStatus.success}
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1 tracking-wider uppercase">
+                          Current Password
+                        </label>
+                        <input
+                          type="password"
+                          className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                          value={passwordData.currentPassword}
+                          onChange={(e) =>
+                            setPasswordData({
+                              ...passwordData,
+                              currentPassword: e.target.value,
+                            })
+                          }
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1 tracking-wider uppercase">
+                          New Password
+                        </label>
+                        <input
+                          type="password"
+                          className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                          value={passwordData.newPassword}
+                          onChange={(e) =>
+                            setPasswordData({
+                              ...passwordData,
+                              newPassword: e.target.value,
+                            })
+                          }
+                          required
+                          minLength={6}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1 tracking-wider uppercase">
+                          Confirm New Password
+                        </label>
+                        <input
+                          type="password"
+                          className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                          value={passwordData.confirmPassword}
+                          onChange={(e) =>
+                            setPasswordData({
+                              ...passwordData,
+                              confirmPassword: e.target.value,
+                            })
+                          }
+                          required
+                          minLength={6}
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={passwordStatus.loading}
+                        className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl font-medium transition-colors disabled:opacity-50 mt-2"
+                      >
+                        {passwordStatus.loading
+                          ? "Updating..."
+                          : "Update Password"}
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-8 flex justify-center pt-8 border-t border-white/5">
                 <button
                   className="premium-btn px-12 py-4 text-lg"
                   onClick={() => setIsEditing(true)}

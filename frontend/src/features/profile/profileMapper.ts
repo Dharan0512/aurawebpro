@@ -11,6 +11,10 @@ export const mapProfileToFormData = (profile: any) => {
     firstName: profile.user?.firstName || "",
     lastName: profile.user?.lastName || "",
     mobile: profile.user?.mobile || "",
+    convenientTimeToCall: profile.profile?.convenientTimeToCall || "Anytime",
+    linkedInUrl: profile.profile?.linkedInUrl || "",
+    instagramUrl: profile.profile?.instagramUrl || "",
+    facebookUrl: profile.profile?.facebookUrl || "",
 
     // Personal Details (Profile Model)
     dob: profile.profile?.dob || "",
@@ -25,6 +29,18 @@ export const mapProfileToFormData = (profile: any) => {
     casteId: profile.profile?.casteId?.toString() || "",
     subCaste: profile.profile?.subcaste || "",
     motherTongue: profile.profile?.motherTongueId?.toString() || "",
+
+    // Horoscope
+    star: profile.profile?.HoroscopeDetail?.star || "",
+    rasi: profile.profile?.HoroscopeDetail?.rasi || "",
+    laknam: profile.profile?.HoroscopeDetail?.laknam || "",
+    gothram: profile.profile?.HoroscopeDetail?.gothram || "",
+    sevvaiDhosham: profile.profile?.HoroscopeDetail?.sevvaiDhosham || "No",
+    rahuKetuDhosham: profile.profile?.HoroscopeDetail?.rahuKetuDhosham || "No",
+    birthTime: profile.profile?.HoroscopeDetail?.birthTime || "",
+    birthPlace: profile.profile?.HoroscopeDetail?.birthPlace || "",
+    horoscopeImageUrl:
+      profile.profile?.HoroscopeDetail?.horoscopeImageUrl || "",
 
     // Education/Career
     educationId: profile.profile?.educationId?.toString() || "",
@@ -51,6 +67,17 @@ export const mapProfileToFormData = (profile: any) => {
     familyStatus: profile.profile?.familyStatus || "Middle Class",
     aboutMe: profile.profile?.aboutMe || "",
 
+    // Family Details
+    fatherName: profile.profile?.FamilyDetail?.fatherName || "",
+    fatherOccupation: profile.profile?.FamilyDetail?.fatherOccupation || "",
+    motherName: profile.profile?.FamilyDetail?.motherName || "",
+    motherOccupation: profile.profile?.FamilyDetail?.motherOccupation || "",
+    familyType: profile.profile?.FamilyDetail?.familyType || "Nuclear",
+    siblingsCount:
+      profile.profile?.FamilyDetail?.siblingsCount?.toString() || "0",
+    ownHouse: profile.profile?.FamilyDetail?.ownHouse ?? false,
+    nativeDistrict: profile.profile?.FamilyDetail?.nativeDistrict || "",
+
     // Preferences
     partnerAgeMin: profile.preferences?.minAge || 22,
     partnerAgeMax: profile.preferences?.maxAge || 30,
@@ -59,9 +86,11 @@ export const mapProfileToFormData = (profile: any) => {
     partnerMaritalStatus: profile.preferences?.maritalStatus || "Never Married",
     partnerReligion: profile.preferences?.religionId?.toString() || "",
     partnerCaste: profile.preferences?.casteId?.toString() || "",
+    partnerCastes: profile.preferences?.partnerCastes || [],
     partnerEducation: profile.preferences?.educationId?.toString() || "",
     partnerCountry: profile.preferences?.countryId?.toString() || "",
     partnerState: profile.preferences?.stateId?.toString() || "",
+    partnerLocationPreference: profile.preferences?.preferredLocation || "",
   };
 };
 
@@ -73,8 +102,16 @@ export const getFormDataDiff = (initialData: any, currentData: any) => {
   const diff: any = {};
 
   Object.keys(currentData).forEach((key) => {
+    // Array comparison
+    if (Array.isArray(currentData[key])) {
+      if (
+        JSON.stringify(currentData[key]) !== JSON.stringify(initialData[key])
+      ) {
+        diff[key] = currentData[key];
+      }
+    }
     // Deep comparison for primitives and simple values
-    if (currentData[key] !== initialData[key]) {
+    else if (currentData[key] !== initialData[key]) {
       diff[key] = currentData[key];
     }
   });

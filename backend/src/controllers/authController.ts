@@ -146,3 +146,49 @@ export const login = async (
     res.status(500).json({ message: "Server error" });
   }
 };
+
+export const changePassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const userReq = (req as any).user;
+    if (!userReq) {
+      res.status(401).json({ message: "Not authorized" });
+      return;
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      res
+        .status(400)
+        .json({ message: "Both current and new passwords are required" });
+      return;
+    }
+
+    const user = await User.findByPk(userReq.id);
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      res.status(400).json({ message: "Incorrect current password" });
+      return;
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+
+    user.passwordHash = passwordHash;
+    await user.save();
+
+    res.status(200).json({ message: "Password changed successfully" });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({ message: "Server error changing password" });
+  }
+};

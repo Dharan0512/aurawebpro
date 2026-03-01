@@ -75,15 +75,22 @@ export const createOrUpdateProfile = async (
   req: AuthRequest,
   res: Response,
 ): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ message: "Not authorized" });
+    return;
+  }
+
   const transaction = await sequelize.transaction();
   try {
-    if (!req.user) {
-      res.status(401).json({ message: "Not authorized" });
-      return;
-    }
-
     const userId = req.user.id;
     const profileData = req.body;
+
+    // Helper to handle empty strings or missing IDs
+    const parseId = (id: any) => {
+      if (id === "" || id === null || id === undefined) return null;
+      const parsed = parseInt(id);
+      return isNaN(parsed) ? null : parsed;
+    };
 
     // 1. Update the base User details
     await User.update(
@@ -101,16 +108,10 @@ export const createOrUpdateProfile = async (
         )
           ? profileData.createdFor || profileData.profileType
           : "Self",
+        countryCodeId: parseId(profileData.countryCodeId),
       },
       { where: { id: userId }, transaction },
     );
-
-    // Helper to handle empty strings or missing IDs
-    const parseId = (id: any) => {
-      if (id === "" || id === null || id === undefined) return null;
-      const parsed = parseInt(id);
-      return isNaN(parsed) ? null : parsed;
-    };
 
     // 2. Upsert UserProfile (Core Identity)
     const dobValue =
@@ -119,20 +120,42 @@ export const createOrUpdateProfile = async (
         : null;
     const dob = dobValue && !isNaN(dobValue.getTime()) ? dobValue : null;
 
+    const heightVal = parseInt(profileData.height || profileData.heightCm);
+    const heightCm = isNaN(heightVal) ? null : heightVal;
+
+    const childrenCountVal = parseInt(profileData.childrenCount);
+    const childrenCount = isNaN(childrenCountVal)
+      ? undefined
+      : childrenCountVal;
+
     const [userProfile] = await UserProfile.upsert(
       {
         userId,
         dob,
-        heightCm: parseInt(profileData.height || profileData.heightCm) || 170,
-        physicalStatus: profileData.physicalStatus || "Normal",
-        maritalStatus: profileData.maritalStatus || "Never Married",
-        childrenCount: parseInt(profileData.childrenCount) || 0,
+        heightCm,
+        physicalStatus: profileData.physicalStatus || null,
+        maritalStatus: profileData.maritalStatus || null,
+        childrenCount,
         religionId: parseId(profileData.religionId),
         casteId: parseId(profileData.casteId),
         motherTongueId: parseId(profileData.motherTongueId),
         subcaste: profileData.subcaste || "",
         complexion: profileData.complexion || "",
         shortBio: profileData.shortBio || profileData.aboutMe || "",
+        convenientTimeToCall: profileData.convenientTimeToCall || null,
+        linkedInUrl: profileData.linkedInUrl || null,
+        instagramUrl: profileData.instagramUrl || null,
+        facebookUrl: profileData.facebookUrl || null,
+        countryId: parseId(profileData.countryId),
+        stateId: parseId(profileData.stateId),
+        cityId: parseId(profileData.cityId),
+        educationId: parseId(profileData.educationId),
+        employmentTypeId: parseId(profileData.employmentTypeId),
+        occupationId: parseId(profileData.occupationId),
+        incomeRangeId: parseId(profileData.incomeRangeId),
+        familyStatus: profileData.familyStatus || null,
+        incomeCurrencyId: parseId(profileData.incomeCurrencyId),
+        profileVisibility: profileData.profileVisibility || "Public",
       },
       { transaction },
     );
@@ -149,7 +172,9 @@ export const createOrUpdateProfile = async (
         motherOccupation: profileData.motherOccupation || null,
         familyType: profileData.familyType || null,
         familyStatus: profileData.familyStatus || null,
-        siblingsCount: parseInt(profileData.siblingsCount) || 0,
+        siblingsCount: isNaN(parseInt(profileData.siblingsCount))
+          ? undefined
+          : parseInt(profileData.siblingsCount),
         ownHouse:
           profileData.ownHouse === true || profileData.ownHouse === "true",
         nativeDistrict: profileData.nativeDistrict || null,
@@ -225,10 +250,17 @@ export const createOrUpdateProfile = async (
         minHeightCm: parseInt(profileData.partnerHeightMin) || null,
         maxHeightCm: parseInt(profileData.partnerHeightMax) || null,
         maritalStatus: profileData.partnerMaritalStatus || null,
-        religionId: parseId(profileData.religionId),
-        casteId: parseId(profileData.casteId),
-        preferredLocation: profileData.preferredLocation || null,
-        preferredEducation: profileData.preferredEducation || null,
+        religionId: parseId(profileData.partnerReligion),
+        casteId: parseId(profileData.partnerCaste),
+        partnerCastes: profileData.partnerCastes || [],
+        preferredLocation:
+          profileData.partnerLocationPreference ||
+          profileData.preferredLocation ||
+          null,
+        preferredEducation:
+          profileData.partnerEducation ||
+          profileData.preferredEducation ||
+          null,
         preferredIncomeRange: profileData.preferredIncomeRange || null,
       },
       { transaction },
@@ -241,7 +273,7 @@ export const createOrUpdateProfile = async (
       profile: userProfile,
     });
   } catch (error: any) {
-    await transaction.rollback();
+    if (transaction) await transaction.rollback();
     console.error("Detailed Profile Save Error:", error);
     res.status(500).json({
       message: "Server error saving profile",
@@ -468,5 +500,207 @@ export const deleteHoroscope = async (
   } catch (error) {
     console.error("Horoscope delete error:", error);
     res.status(500).json({ message: "Server error deleting horoscope" });
+  }
+};
+
+export const getOtherProfile = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
+  try {
+    const targetUserId = req.params.id;
+    if (!targetUserId) {
+      res.status(400).json({ message: "User ID required" });
+      return;
+    }
+
+    const parsedId = parseInt(targetUserId as string);
+    if (isNaN(parsedId)) {
+      res.status(400).json({ message: "Invalid User ID" });
+      return;
+    }
+
+    const user = await User.findByPk(parsedId, {
+      attributes: { exclude: ["password", "email", "mobile", "countryCodeId"] }, // Protect PII
+    });
+
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    const userProfile = await UserProfile.findOne({
+      where: { userId: parsedId },
+      include: [
+        Religion,
+        City,
+        State,
+        Country,
+        MotherTongue,
+        Caste,
+        FamilyDetails,
+        HoroscopeDetails,
+        LocationLifestyle,
+        EducationCareer,
+        Badge,
+      ],
+    });
+
+    if (!userProfile) {
+      res.status(404).json({ message: "Profile not found" });
+      return;
+    }
+
+    if (userProfile.profileVisibility === "Hidden") {
+      res.status(403).json({ message: "This profile is private." });
+      return;
+    }
+
+    if (userProfile.profileVisibility === "Members Only") {
+      if (!req.user) {
+        res
+          .status(401)
+          .json({ message: "You must be logged in to view this profile." });
+        return;
+      }
+    }
+
+    const userPhotos = await UserPhoto.findAll({
+      where: { userId: targetUserId },
+      order: [["order", "ASC"]],
+    });
+
+    // Setup Default Privacy fallback
+    const defaultPrivacy = {
+      showExactIncome: false,
+      showFamilyDetails: true,
+      showBirthDetails: true,
+      showSocialLinks: true,
+      showValues: true,
+      showHoroscope: true,
+      showAstroMatch: true,
+    };
+
+    const privacy = userProfile.privacySettings
+      ? { ...defaultPrivacy, ...userProfile.privacySettings }
+      : defaultPrivacy;
+
+    const safeProfile = userProfile.toJSON() as any;
+
+    // 1. Exact income
+    if (!privacy.showExactIncome && safeProfile.EducationCareer) {
+      delete safeProfile.EducationCareer.exactIncome;
+    }
+
+    // 2. Family Details
+    if (!privacy.showFamilyDetails) {
+      delete safeProfile.FamilyDetails; // Note plural to match association
+      delete safeProfile.FamilyDetail; // Fallback just in case
+    }
+
+    // 3. Birth details & Gothram
+    if (!privacy.showBirthDetails && safeProfile.HoroscopeDetails) {
+      delete safeProfile.HoroscopeDetails.birthTime;
+      delete safeProfile.HoroscopeDetails.birthPlace;
+      delete safeProfile.HoroscopeDetails.gothram;
+    }
+    if (!privacy.showBirthDetails && safeProfile.HoroscopeDetail) {
+      delete safeProfile.HoroscopeDetail.birthTime;
+      delete safeProfile.HoroscopeDetail.birthPlace;
+      delete safeProfile.HoroscopeDetail.gothram;
+    }
+
+    // 4. Values ratings
+    if (!privacy.showValues && safeProfile.LocationLifestyle) {
+      delete safeProfile.LocationLifestyle.ambition;
+      delete safeProfile.LocationLifestyle.familyOrientation;
+      delete safeProfile.LocationLifestyle.emotionalStability;
+      delete safeProfile.LocationLifestyle.communicationStyle;
+      delete safeProfile.LocationLifestyle.spiritualInclination;
+    }
+
+    // 5. Social Links
+    if (!privacy.showSocialLinks) {
+      delete safeProfile.linkedInUrl;
+      delete safeProfile.instagramUrl;
+      delete safeProfile.facebookUrl;
+    }
+
+    // 6. Horoscope
+    if (!privacy.showHoroscope) {
+      delete safeProfile.HoroscopeDetails;
+      delete safeProfile.HoroscopeDetail;
+    }
+
+    res.status(200).json({
+      user,
+      profile: safeProfile,
+      photos: userPhotos.map((p) => ({ id: p.id, url: p.url })),
+      privacySettings: privacy, // Optional: for frontend to know what it is allowed to show functionally (e.g for "showAstroMatch")
+    });
+  } catch (error) {
+    console.error("Fetch other profile error:", error);
+    res.status(500).json({ message: "Server error fetching profile" });
+  }
+};
+
+export const updatePrivacySettings = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ message: "Not authorized" });
+      return;
+    }
+
+    const userId = req.user.id;
+    const { privacySettings, profileVisibility } = req.body;
+
+    const profile = await UserProfile.findOne({ where: { userId } });
+    if (!profile) {
+      res.status(404).json({ message: "Profile not found" });
+      return;
+    }
+
+    if (privacySettings) {
+      const allowedKeys = [
+        "showExactIncome",
+        "showFamilyDetails",
+        "showBirthDetails",
+        "showSocialLinks",
+        "showValues",
+        "showHoroscope",
+        "showAstroMatch",
+      ];
+
+      const safePrivacySettings: any = {};
+
+      for (const key of allowedKeys) {
+        if (privacySettings[key] !== undefined) {
+          safePrivacySettings[key] = Boolean(privacySettings[key]);
+        }
+      }
+
+      profile.privacySettings = {
+        ...profile.privacySettings,
+        ...safePrivacySettings,
+      };
+    }
+
+    if (profileVisibility) {
+      profile.profileVisibility = profileVisibility;
+    }
+
+    await profile.save();
+
+    res.status(200).json({
+      message: "Privacy settings updated successfully",
+      privacySettings: profile.privacySettings,
+      profileVisibility: profile.profileVisibility,
+    });
+  } catch (error) {
+    console.error("Update privacy error:", error);
+    res.status(500).json({ message: "Server error updating privacy settings" });
   }
 };
